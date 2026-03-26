@@ -311,6 +311,54 @@ fn show_addons_window(parent: &ApplicationWindow) {
 
     pref_window.add(&page);
 
+    let window_clone = pref_window.clone();
+
+    add_button.connect_clicked(move |_| {
+        let new_url = url_entry.text().to_string();
+
+        if !new_url.is_empty() {
+            println!("Fetching manifest from URL: {}", new_url);
+
+            let url_clone = new_url.clone();
+            let window_for_async = window_clone.clone();
+
+            glib::spawn_future_local(async move {
+                let (sender, receiver) = tokio::sync::oneshot::channel();
+                let url_for_thread = url_clone.clone();
+
+                thread::spawn(move || {
+                    let rt = tokio::runtime::Runtime::new().unwrap();
+                    rt.block_on(async {
+                        let result = client::fetch_manifest(&url_for_thread).await;
+                        let _ = sender.send(result);
+                    });
+                });
+
+                if let Ok(Ok(manifest)) = receiver.await {
+                    let mut current_config = crate::stremio::store::load_addons();
+
+                    if !current_config.addons.iter().any(|a| a.transport_url == url_clone) {
+                        let installed_addon = crate::stremio::store::InstalledAddon {
+                            transport_url: url_clone.clone(),
+                            manifest,
+                        };
+
+                        current_config.addons.push(installed_addon);
+                        crate::stremio::store::save_addons(&current_config);
+
+                        println!("✅ Successfully installed and saved: {}", url_clone);
+
+                        window_for_async.close();
+                    } else {
+                        println!("⚠️ Add-on already installed: {}", url_clone);
+                    }
+                } else {
+                    println!("❌ Failed to fetch manifest from URL: {}", url_clone);
+                }
+            });
+        }
+    });
+
     pref_window.present();
 }
 
