@@ -94,3 +94,17 @@ pub struct MetaPreview {
     pub background: String,
     pub logo: String,
 }
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct StreamResponse {
+    pub streams: Vec<Stream>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Stream {
+    pub name: Option<String>,
+    pub title: Option<String>,
+    pub url: Option<String>,
+    pub info_hash: Option<String>,
+    pub file_idx: Option<u32>,
+}
