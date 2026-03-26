@@ -1,4 +1,4 @@
-mod streamio;
+mod stremio;
 mod ui;
 
 use adw::prelude::*;

@@ -1,12 +1,12 @@
 use std::sync::mpsc;
 use std::thread;
 
-use adw::prelude::*;
+use adw::{ActionRow, ApplicationWindow, EntryRow, PreferencesGroup, PreferencesPage, PreferencesWindow, prelude::*};
 use adw::{Application, HeaderBar, NavigationView, NavigationPage, ToolbarView};
-use gtk::{Box, CssProvider, FlowBox, GestureClick, Label, Picture, ScrolledWindow, StyleContext, gio, glib};
+use gtk::{Box, Button, CssProvider, FlowBox, GestureClick, Label, Overlay, Picture, ScrolledWindow, StyleContext, gio, glib};
 
-use crate::streamio::client;
-use crate::streamio::models::MetaPreview;
+use crate::stremio::client;
+use crate::stremio::models::MetaPreview;
 
 fn load_css() {
     let css_data = "
@@ -37,6 +37,53 @@ fn load_css() {
             font-size: 14px;
             margin-top: 4px;
         }
+
+        /* Details page styles */
+        .trailer-button {
+            background-color: alpha(white, 0.1);
+            color: white;
+            font-weight: bold;
+            border-radius: 24px;
+            padding: 12px 32px;
+            border: 1px solid alpha(white, 0.2);
+            transition: all 0.2s ease;
+        }
+        .trailer-button:hover {
+            background-color: alpha(white, 0.2);
+        }
+
+        .details-gradient {
+            background-image: linear-gradient(to right, rgba(0,0,0, 0.9) 0%, rgba(0,0,0, 0.6) 40%, transparent 100%);
+        }
+        .details-meta {
+            color: #aaaaaa;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .details-desc {
+            font-size: 16px;
+            line-height: 1.4;
+            color: #eeeeee;
+        }
+        .details-cast {
+            font-size: 14px;
+            color: #888888;
+        }
+
+        .custom-back-btn {
+            background-color: alpha(black, 0.5);
+            color: white;
+            border-radius: 50px;
+            padding: 12px 20px;
+            font-weight: bold;
+            font-size: 14px;
+            border: 1px solid alpha(white, 0.2);
+            transition: all 0.2s ease;
+        }
+        .custom-back-btn:hover {
+            background-color: alpha(white, 0.2);
+            transform: scale(1.05);
+        }
     ";
 
     let provider = CssProvider::new();
@@ -49,44 +96,222 @@ fn load_css() {
     );
 }
 
-fn build_details_page(movie: &MetaPreview) -> NavigationPage {
-    let toolbar_view = ToolbarView::builder().build();
-    let header_bar = HeaderBar::builder()
-        .show_start_title_buttons(false)
-        .show_end_title_buttons(false)
+fn build_details_page(movie: &MetaPreview, nav_view: &NavigationView) -> NavigationPage {
+    let overlay = Overlay::builder().build();
+
+    let bg_picture = Picture::builder()
+        .content_fit(gtk::ContentFit::Cover)
+        .can_shrink(true)
+        .hexpand(true)
+        .vexpand(true)
         .build();
-    toolbar_view.add_top_bar(&header_bar);
+
+    if !movie.background.is_empty() {
+        let bg_picture_clone = bg_picture.clone();
+        let bg_url = movie.background.clone();
+
+        glib::spawn_future_local(async move {
+            let file = gio::File::for_uri(&bg_url);
+
+            if let Ok((bytes, _)) = file.load_bytes_future().await {
+                if let Ok(texture) = gtk::gdk::Texture::from_bytes(&bytes) {
+                    bg_picture_clone.set_paintable(Some(&texture));
+                }
+            }
+        });
+    }
+    overlay.set_child(Some(&bg_picture));
+
+    let gradient_box = Box::builder()
+        .hexpand(true)
+        .vexpand(true)
+        .css_classes(["details-gradient"])
+        .build();
+    overlay.add_overlay(&gradient_box);
+
+    let back_button = Button::builder()
+        .label("← Back") // You can use a specific icon here later!
+        .halign(gtk::Align::Start)
+        .valign(gtk::Align::Start)
+        .margin_bottom(48)
+        .css_classes(["custom-back-btn"])
+        .build();
+
+    let nav_clone = nav_view.clone();
+    back_button.connect_clicked(move |_| {
+        nav_clone.pop();
+    });
 
     let content_box = Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(24)
+        .spacing(16)
         .margin_top(48)
         .margin_bottom(48)
-        .halign(gtk::Align::Center)
+        .margin_start(48)
+        .halign(gtk::Align::Start)
+        .valign(gtk::Align::Start)
         .build();
 
-    let picture = Picture::builder()
-        .height_request(360) // Bigger poster!
-        .width_request(240)
-        .content_fit(gtk::ContentFit::Cover)
+    let logo_picture = Picture::builder()
+        .content_fit(gtk::ContentFit::Contain)
         .can_shrink(true)
-        .css_classes(["details-poster"])
+        .height_request(120)
         .build();
 
-    let title = Label::builder()
-        .label(&movie.name)
-        .css_classes(["title-1"]) // Built-in Adwaita class for large titles
+    let logo_clamp = adw::Clamp::builder()
+        .maximum_size(350) // The logo will absolutely NEVER exceed 350px wide
+        .halign(gtk::Align::Start) // Left-align the clamp container
+        .child(&logo_picture)
         .build();
 
-    content_box.append(&picture);
-    content_box.append(&title);
+    if !movie.logo.is_empty() {
+        let logo_clone = logo_picture.clone();
+        let logo_url = movie.logo.clone();
 
-    toolbar_view.set_content(Some(&content_box));
+        glib::spawn_future_local(async move {
+            let file = gio::File::for_uri(&logo_url);
+
+            if let Ok((bytes, _)) = file.load_bytes_future().await {
+                if let Ok(texture) = gtk::gdk::Texture::from_bytes(&bytes) {
+                    logo_clone.set_paintable(Some(&texture));
+                }
+            }
+        });
+    }
+
+    let genres_str = movie.genres.join(", ");
+    let meta_string = format!("{}  •  {}  •  {}", movie.year, movie.runtime, genres_str);
+    let meta_label = Label::builder()
+        .label(&meta_string)
+        .halign(gtk::Align::Start)
+        .css_classes(["details-meta"])
+        .margin_top(24)
+        .build();
+
+    let desc_label = Label::builder()
+        .label(&movie.description)
+        .wrap(true)
+        .max_width_chars(60)
+        .halign(gtk::Align::Start)
+        .css_classes(["details-desc"])
+        .build();
+
+    let cast_str = movie.casts.join(", ");
+    let cast_label = Label::builder()
+        .label(&format!("Starring: {}", cast_str))
+        .wrap(true)
+        .max_width_chars(60)
+        .halign(gtk::Align::Start)
+        .css_classes(["details-cast"])
+        .build();
+
+    let trailer_button = Button::builder()
+        .label("Play Trailer")
+        .css_classes(["trailer-button", "pill"])
+        .halign(gtk::Align::Start)
+        .margin_top(24)
+        .build();
+
+    content_box.append(&back_button);
+
+    content_box.append(&logo_clamp);
+
+    content_box.append(&meta_label);
+    content_box.append(&desc_label);
+    content_box.append(&cast_label);
+    content_box.append(&trailer_button);
+
+    overlay.add_overlay(&content_box);
 
     NavigationPage::builder()
         .title(&movie.name)
-        .child(&toolbar_view)
+        .child(&overlay)
         .build()
+}
+
+fn show_addons_window(parent: &ApplicationWindow) {
+    let pref_window = PreferencesWindow::builder()
+        .transient_for(parent)
+        .modal(true)
+        .default_width(600)
+        .default_height(400)
+        .title("Manage Add-ons")
+        .build();
+
+    let page = PreferencesPage::builder()
+        .build();
+
+    let add_group = PreferencesGroup::builder()
+        .title("Add New Add-on")
+        .description("Enter the manifest URL of a Stremio add-on to install it.")
+        .build();
+
+    let url_entry = EntryRow::builder()
+        .title("Manifest URL")
+        .build();
+
+    let add_button = Button::builder()
+        .label("Install")
+        .valign(gtk::Align::Start)
+        .css_classes(["suggested-action", "pill"])
+        .build();
+
+    url_entry.add_suffix(&add_button);
+    add_group.add(&url_entry);
+    page.add(&add_group);
+
+    let installed_group = PreferencesGroup::builder()
+        .title("Installed Add-ons")
+        .build();
+
+    let config = crate::stremio::store::load_addons();
+
+    for addon in config.addons {
+        let addon_row = ActionRow::builder()
+            .title(&addon.manifest.name)
+            .subtitle(&format!("Version: {}", addon.manifest.version))
+            .build();
+
+        if !addon.manifest.logo.is_empty() {
+            let logo_picture = Picture::builder()
+                .content_fit(gtk::ContentFit::Contain)
+                .can_shrink(true)
+                .width_request(48)
+                .height_request(48)
+                .margin_end(12)
+                .build();
+
+            let logo_url = addon.manifest.logo.clone();
+            let logo_clone = logo_picture.clone();
+
+            glib::spawn_future_local(async move {
+                let file = gio::File::for_uri(&logo_url);
+
+                if let Ok((bytes, _)) = file.load_bytes_future().await {
+                    if let Ok(texture) = gtk::gdk::Texture::from_bytes(&bytes) {
+                        logo_clone.set_paintable(Some(&texture));
+                    }
+                }
+            });
+
+            addon_row.add_prefix(&logo_picture);
+        }
+
+        let remove_btn = Button::builder()
+            .label("Remove")
+            .valign(gtk::Align::Center)
+            .css_classes(["destructive-action", "pill"])
+            .build();
+
+        addon_row.add_suffix(&remove_btn);
+        installed_group.add(&addon_row);
+    }
+
+    page.add(&installed_group);
+
+    pref_window.add(&page);
+
+    pref_window.present();
 }
 
 pub fn build_ui(app: &Application) {
@@ -136,6 +361,13 @@ pub fn build_ui(app: &Application) {
         .build();
     let app_header = HeaderBar::builder().build();
 
+    let addons_btn = Button::builder()
+        .icon_name("preferences-system-symbolic")
+        .tooltip_text("manage addons")
+        .build();
+
+    app_header.pack_end(&addons_btn);
+
     content_box.append(&app_header);
     content_box.append(&nav_view);
 
@@ -147,21 +379,36 @@ pub fn build_ui(app: &Application) {
         .content(&content_box)
         .build();
 
+    let window_clone = window.clone();
+    addons_btn.connect_clicked(move |_| {
+        show_addons_window(&window_clone);
+    });
+
     let (sender, receiver) = mpsc::channel::<Vec<MetaPreview>>();
 
     thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
-
         rt.block_on(async {
-            let manifest_url = "https://v3-cinemeta.strem.io/manifest.json";
+            let config = crate::stremio::store::init_addons().await;
 
-            match client::fetch_catalog(manifest_url, "movie", "top").await {
-                Ok(manifest) => {
-                    if let Err(e) = sender.send(manifest.metas) {
-                        eprintln!("Error sending catalog data: {}", e);
+            for addon in config.addons {
+                if addon.manifest.supports_resource("catalog", "movie") {
+                    println!("Addon supports movie catalogs. Fetching top movies...");
+
+                    if let Some(catalog) = addon.manifest.catalogs.iter().find(|c| c.item_type == "movie") {
+                        if let Ok(catalog_response) = client::fetch_catalog(
+                            &addon.transport_url,
+                            &catalog.item_type,
+                            &catalog.id
+                        ).await {
+                            if let Err(e) = sender.send(catalog_response.metas) {
+                                eprintln!("Error sending catalog data: {}", e);
+                            }
+                        } else {
+                            eprintln!("Error fetching catalog from addon: {}", addon.manifest.name);
+                        }
                     }
                 }
-                Err(e) => eprintln!("Error fetching manifest: {}", e),
             }
         });
     });
@@ -203,7 +450,7 @@ pub fn build_ui(app: &Application) {
                 let movie_clone = movie.clone();
 
                 click_gesture.connect_released(move |_, _, _, _| {
-                    let details_page = build_details_page(&movie_clone);
+                    let details_page = build_details_page(&movie_clone, &nav_view_for_click);
 
                     nav_view_for_click.push(&details_page);
                 });
