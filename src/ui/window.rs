@@ -1,9 +1,9 @@
 use std::sync::mpsc;
 use std::thread;
 
-use adw::{ActionRow, ApplicationWindow, EntryRow, PreferencesGroup, PreferencesPage, PreferencesWindow, prelude::*};
+use adw::{ActionRow, ApplicationWindow, EntryRow, PreferencesGroup, PreferencesPage, PreferencesWindow, StatusPage, prelude::*};
 use adw::{Application, HeaderBar, NavigationView, NavigationPage, ToolbarView};
-use gtk::{Box, Button, CssProvider, FlowBox, GestureClick, Label, Overlay, Picture, ScrolledWindow, StyleContext, gio, glib};
+use gtk::{Box, Button, CssProvider, FlowBox, GestureClick, Label, Overlay, Picture, ScrolledWindow, Stack, StyleContext, gio, glib};
 
 use crate::stremio::client;
 use crate::stremio::models::MetaPreview;
@@ -27,8 +27,9 @@ fn load_css() {
         /* Round the corners of the movie poster */
         .card-poster {
             border-radius: 8px;
-            /* A subtle inner shadow to make the image pop */
             box-shadow: inset 0 0 0 1px alpha(white, 0.1);
+            /* NEW: A subtle placeholder background before the image loads */
+            background-color: alpha(white, 0.05);
         }
 
         /* Style the title text */
@@ -111,10 +112,16 @@ fn build_details_page(movie: &MetaPreview, nav_view: &NavigationView) -> Navigat
         let bg_url = movie.background.clone();
 
         glib::spawn_future_local(async move {
-            let file = gio::File::for_uri(&bg_url);
+            let (tx, rx) = tokio::sync::oneshot::channel();
 
-            if let Ok((bytes, _)) = file.load_bytes_future().await {
-                if let Ok(texture) = gtk::gdk::Texture::from_bytes(&bytes) {
+            crate::RUNTIME.get().unwrap().spawn(async move {
+                let bytes = crate::stremio::cache::fetch_or_cache_image(bg_url).await;
+                let _ = tx.send(bytes);
+            });
+
+            if let Ok(Some(bytes)) = rx.await {
+                let glib_bytes = glib::Bytes::from(&bytes);
+                if let Ok(texture) = gtk::gdk::Texture::from_bytes(&glib_bytes) {
                     bg_picture_clone.set_paintable(Some(&texture));
                 }
             }
@@ -164,19 +171,41 @@ fn build_details_page(movie: &MetaPreview, nav_view: &NavigationView) -> Navigat
         .child(&logo_picture)
         .build();
 
+    let title_label = Label::builder().label(&movie.name).css_classes(["title-1"]).halign(gtk::Align::Start).build();
+    title_label.set_visible(false);
+
     if !movie.logo.is_empty() {
         let logo_clone = logo_picture.clone();
+        let logo_clamp_clone = logo_clamp.clone();
+        let title_label_clone = title_label.clone();
         let logo_url = movie.logo.clone();
 
         glib::spawn_future_local(async move {
-            let file = gio::File::for_uri(&logo_url);
+            let (tx, rx) = tokio::sync::oneshot::channel();
 
-            if let Ok((bytes, _)) = file.load_bytes_future().await {
-                if let Ok(texture) = gtk::gdk::Texture::from_bytes(&bytes) {
+            crate::RUNTIME.get().unwrap().spawn(async move {
+                let bytes = crate::stremio::cache::fetch_or_cache_image(logo_url).await;
+                let _ = tx.send(bytes);
+            });
+
+            let mut loaded_successfully = false;
+
+            if let Ok(Some(bytes)) = rx.await {
+                let glib_bytes = glib::Bytes::from(&bytes);
+                if let Ok(texture) = gtk::gdk::Texture::from_bytes(&glib_bytes) {
                     logo_clone.set_paintable(Some(&texture));
+                    loaded_successfully = true;
                 }
             }
+
+            if !loaded_successfully {
+                logo_clamp_clone.set_visible(false);
+                title_label_clone.set_visible(true);
+            }
         });
+    } else {
+        logo_clamp.set_visible(false);
+        title_label.set_visible(true);
     }
 
     let genres_str = movie.genres.join(", ");
@@ -215,6 +244,7 @@ fn build_details_page(movie: &MetaPreview, nav_view: &NavigationView) -> Navigat
     content_box.append(&back_button);
 
     content_box.append(&logo_clamp);
+    content_box.append(&title_label);
 
     content_box.append(&meta_label);
     content_box.append(&desc_label);
@@ -281,6 +311,12 @@ fn show_addons_window(parent: &ApplicationWindow) {
                 .margin_end(12)
                 .build();
 
+            let logo_clamp = adw::Clamp::builder()
+                .maximum_size(48) // The logo will absolutely NEVER exceed 350px wide
+                .halign(gtk::Align::Center) // Left-align the clamp container
+                .child(&logo_picture)
+                .build();
+
             let logo_url = addon.manifest.logo.clone();
             let logo_clone = logo_picture.clone();
 
@@ -294,7 +330,7 @@ fn show_addons_window(parent: &ApplicationWindow) {
                 }
             });
 
-            addon_row.add_prefix(&logo_picture);
+            addon_row.add_prefix(&logo_clamp);
         }
 
         let remove_btn = Button::builder()
@@ -324,14 +360,11 @@ fn show_addons_window(parent: &ApplicationWindow) {
 
             glib::spawn_future_local(async move {
                 let (sender, receiver) = tokio::sync::oneshot::channel();
-                let url_for_thread = url_clone.clone();
+                let url_for_tokio = url_clone.clone();
 
-                thread::spawn(move || {
-                    let rt = tokio::runtime::Runtime::new().unwrap();
-                    rt.block_on(async {
-                        let result = client::fetch_manifest(&url_for_thread).await;
-                        let _ = sender.send(result);
-                    });
+                crate::RUNTIME.get().unwrap().spawn(async move {
+                    let result = crate::stremio::client::fetch_manifest(&url_for_tokio).await;
+                    let _ = sender.send(result);
                 });
 
                 if let Ok(Ok(manifest)) = receiver.await {
@@ -362,6 +395,26 @@ fn show_addons_window(parent: &ApplicationWindow) {
     pref_window.present();
 }
 
+fn apply_fallback_icon(picture: &Picture) {
+    if let Some(display) = gtk::gdk::Display::default() {
+        let icon_theme = gtk::IconTheme::for_display(&display);
+
+        let paintable = icon_theme.lookup_icon(
+            "video-x-generic-symbolic",
+            &[] as &[&str], // No fallbacks needed
+            64,             // Size
+            1,              // Scale
+            gtk::TextDirection::Ltr,
+            gtk::IconLookupFlags::empty(),
+        );
+
+        picture.set_paintable(Some(&paintable));
+        picture.set_opacity(0.3);
+
+        picture.set_content_fit(gtk::ContentFit::ScaleDown);
+    }
+}
+
 pub fn build_ui(app: &Application) {
     let style_manager = adw::StyleManager::default();
     style_manager.set_color_scheme(adw::ColorScheme::ForceDark);
@@ -370,11 +423,21 @@ pub fn build_ui(app: &Application) {
     let nav_view = NavigationView::builder().build();
 
     let catalog_toolbar = ToolbarView::builder().build();
-    let catalog_header = HeaderBar::builder()
-        .show_start_title_buttons(false)
-        .show_end_title_buttons(false)
+
+    let loading_page = StatusPage::builder()
+        .icon_name("network-workgroup-symbolic")
+        .title("Loading Catalog")
+        .description("Fetching movies...")
         .build();
-    catalog_toolbar.add_top_bar(&catalog_header);
+
+    let spinner = gtk::Spinner::builder()
+        .spinning(true)
+        .width_request(32)
+        .height_request(32)
+        .margin_top(16)
+        .build();
+
+    loading_page.set_child(Some(&spinner));
 
     let scrolled_window = ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Never)
@@ -396,7 +459,18 @@ pub fn build_ui(app: &Application) {
         .build();
 
     scrolled_window.set_child(Some(&flow_box));
-    catalog_toolbar.set_content(Some(&scrolled_window));
+
+    let main_stack = Stack::builder()
+        .transition_type(gtk::StackTransitionType::Crossfade)
+        .transition_duration(300)
+        .build();
+
+    main_stack.add_named(&loading_page, Some("loading"));
+    main_stack.add_named(&scrolled_window, Some("catalog"));
+
+    main_stack.set_visible_child_name("loading");
+
+    catalog_toolbar.set_content(Some(&main_stack));
 
     let catalog_page = NavigationPage::builder()
         .title("Movies")
@@ -434,37 +508,37 @@ pub fn build_ui(app: &Application) {
 
     let (sender, receiver) = mpsc::channel::<Vec<MetaPreview>>();
 
-    thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            let config = crate::stremio::store::init_addons().await;
+    crate::RUNTIME.get().unwrap().spawn(async move {
+        let config = crate::stremio::store::init_addons().await;
 
-            for addon in config.addons {
-                if addon.manifest.supports_resource("catalog", "movie") {
-                    println!("Addon supports movie catalogs. Fetching top movies...");
+        for addon in config.addons {
+            if addon.manifest.supports_resource("catalog", "movie") {
+                println!("Addon supports movie catalogs. Fetching top movies...");
 
-                    if let Some(catalog) = addon.manifest.catalogs.iter().find(|c| c.item_type == "movie") {
-                        if let Ok(catalog_response) = client::fetch_catalog(
-                            &addon.transport_url,
-                            &catalog.item_type,
-                            &catalog.id
-                        ).await {
-                            if let Err(e) = sender.send(catalog_response.metas) {
-                                eprintln!("Error sending catalog data: {}", e);
-                            }
-                        } else {
-                            eprintln!("Error fetching catalog from addon: {}", addon.manifest.name);
+                if let Some(catalog) = addon.manifest.catalogs.iter().find(|c| c.item_type == "movie") {
+                    if let Ok(catalog_response) = client::fetch_catalog(
+                        &addon.transport_url,
+                        &catalog.item_type,
+                        &catalog.id
+                    ).await {
+                        if let Err(e) = sender.send(catalog_response.metas) {
+                            eprintln!("Error sending catalog data: {}", e);
                         }
+                    } else {
+                        eprintln!("Error fetching catalog from addon: {}", addon.manifest.name);
                     }
                 }
             }
-        });
+        }
     });
 
     let nav_view_clone = nav_view.clone();
+    let stack_clone = main_stack.clone();
 
     glib::spawn_future_local(async move {
         while let Some(movies) = receiver.recv().ok() {
+            stack_clone.set_visible_child_name("catalog");
+
             for movie in movies {
                 let movie_card = Box::builder()
                     .orientation(gtk::Orientation::Vertical)
@@ -476,12 +550,17 @@ pub fn build_ui(app: &Application) {
                     .build();
 
                 let picture = Picture::builder()
-                    .width_request(160)
-                    .height_request(450)
+                    .width_request(260)
+                    .height_request(390)
                     .content_fit(gtk::ContentFit::Cover)
                     .valign(gtk::Align::Fill)
                     .halign(gtk::Align::Fill)
                     .css_classes(["card-poster"])
+                    .build();
+
+                let picture_clamp = adw::Clamp::builder()
+                    .maximum_size(260) // The poster will absolutely NEVER exceed 160px wide
+                    .child(&picture)
                     .build();
 
                 let title = Label::builder()
@@ -504,21 +583,40 @@ pub fn build_ui(app: &Application) {
                 });
                 movie_card.add_controller(click_gesture);
 
-                movie_card.append(&picture);
+                movie_card.append(&picture_clamp);
                 movie_card.append(&title);
                 flow_box.append(&movie_card);
 
                 let pic_clone = picture.clone();
 
-                glib::spawn_future_local(async move {
-                    let file = gio::File::for_uri(&movie.poster);
+                if !movie.poster.is_empty() {
+                    let poster_url = movie.poster.clone();
 
-                    if let Ok((bytes, _)) = file.load_bytes_future().await {
-                        if let Ok(texture) = gtk::gdk::Texture::from_bytes(&bytes) {
-                            pic_clone.set_paintable(Some(&texture));
+                    glib::spawn_future_local(async move {
+                        let (tx, rx) = tokio::sync::oneshot::channel();
+
+                        crate::RUNTIME.get().unwrap().spawn(async move {
+                            let result = crate::stremio::cache::fetch_or_cache_image(poster_url).await;
+                            let _ = tx.send(result);
+                        });
+
+                        let mut loaded_successfully = false;
+
+                        if let Ok(Some(bytes)) = rx.await {
+                            let glib_bytes = glib::Bytes::from(&bytes);
+                            if let Ok(texture) = gtk::gdk::Texture::from_bytes(&glib_bytes) {
+                                pic_clone.set_paintable(Some(&texture));
+                                loaded_successfully = true;
+                            }
                         }
-                    }
-                });
+
+                        if !loaded_successfully {
+                            apply_fallback_icon(&pic_clone);
+                        }
+                    });
+                } else {
+                    apply_fallback_icon(&pic_clone);
+                }
             }
             break;
         }
