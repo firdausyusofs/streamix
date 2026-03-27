@@ -101,6 +101,7 @@ pub struct StreamResponse {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Stream {
     pub name: Option<String>,
     pub title: Option<String>,

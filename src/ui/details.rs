@@ -1,3 +1,4 @@
+use adw::prelude::*;
 use gtk::{ListBox, Stack, prelude::*};
 use adw::{ActionRow, NavigationPage, NavigationView, StatusPage};
 use gtk::{Overlay, Picture, Box, Button, Label};
@@ -257,14 +258,34 @@ pub fn build_details_page(movie: &MetaPreview, nav_view: &NavigationView) -> Nav
             for stream in response.streams {
                 let name = stream.name.unwrap_or_else(|| "Unknown Stream".to_string());
                 let title = stream.title.unwrap_or_else(|| "No Title".to_string());
+                let play_target = stream
+                    .url
+                    .clone()
+                    .or(stream.info_hash.clone())
+                    .unwrap_or_else(|| "Unavailable".to_string());
 
                 let row = ActionRow::builder()
                     .title(&name)
                     .subtitle(&title)
                     .title_lines(1)
                     .subtitle_lines(2)
+                    .activatable(true)
                     .build();
 
+                let play_btn = gtk::Button::builder()
+                    .icon_name("media-playback-start-symbolic")
+                    .tooltip_text("Play")
+                    .css_classes(["flat"])
+                    .valign(gtk::Align::Center)
+                    .build();
+
+                let play_target_btn = play_target.clone();
+                play_btn.connect_clicked(move |_| {
+                    println!("Play stream: {}", play_target_btn);
+                });
+
+                row.add_suffix(&play_btn);
+                row.set_activatable_widget(Some(&play_btn));
                 stream_listbox_clone.append(&row);
             }
         }
