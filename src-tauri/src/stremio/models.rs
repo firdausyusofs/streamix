@@ -72,12 +72,12 @@ pub struct CatalogDescriptor {
     pub name: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CatalogResponse {
     pub metas: Vec<MetaPreview>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MetaPreview {
     pub id: String,
     pub name: String,
@@ -95,12 +95,12 @@ pub struct MetaPreview {
     pub logo: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StreamResponse {
     pub streams: Vec<Stream>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Stream {
     pub name: Option<String>,

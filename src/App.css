@@ -1,0 +1,153 @@
+:root {
+  --bg-color: #0b0f19; /* Deep, immersive dark blue/black */
+  --surface-color: #1a2235;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --accent-color: #3b82f6; /* A nice modern blue */
+  --card-radius: 12px;
+  --transition-speed: 0.3s;
+}
+
+/* Global Native App Feel */
+body {
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  /* Hide the scrollbar but keep scrolling for a native feel */
+  scrollbar-width: none;
+}
+body::-webkit-scrollbar {
+  display: none;
+}
+
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Glassmorphism Header */
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 100;
+  padding: 24px 40px;
+  background: rgba(11, 15, 25, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(to right, #fff, #94a3b8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* The Grid */
+.page-content {
+  padding: 32px 40px;
+  padding-top: 120px; /* Account for fixed header */
+}
+
+.movie-grid {
+  display: grid;
+  /* Scales beautifully on any window size */
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 32px 24px;
+}
+
+/* Premium Movie Cards */
+.movie-card {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform var(--transition-speed) cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Pop-out effect on hover */
+.movie-card:hover {
+  transform: translateY(-8px) scale(1.03);
+}
+
+.poster-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: var(--surface-color);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  transition: box-shadow 0.25s ease;
+
+  /* Safari/Webkit fix to ensure border-radius doesn't break during transforms */
+  -webkit-backface-visibility: hidden;
+  -moz-backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
+}
+
+.movie-card:hover .poster-wrapper {
+  /* Layer 1: A bright, tight ring right on the edge (like a 1px border)
+    Layer 2: A wide, soft, lighter glow spreading outward
+    Layer 3: A standard drop shadow below it to keep depth
+  */
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.3),
+    0 0 100px rgba(255, 255, 255, 0.15),
+    0 12px 24px rgba(0, 0, 0, 0.6);
+}
+
+/* .poster-wrapper img { */
+/*   width: 100%; */
+/*   height: 100%; */
+/*   object-fit: cover; */
+/*   display: block; */
+/*   transition: transform var(--transition-speed) ease; */
+/* } */
+
+.movie-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+.movie-info h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.movie-info span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* Loading & Error Screens */
+.status-screen {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.error {
+  color: #ef4444;
+}
