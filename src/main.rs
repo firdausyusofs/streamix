@@ -14,6 +14,10 @@ fn main() {
         .set(Runtime::new().expect("Failed to create Tokio runtime"))
         .unwrap();
 
+    RUNTIME.get().unwrap().spawn(async {
+        crate::stremio::server::start_server().await;
+    });
+
     let app = Application::builder()
         .application_id("com.fy.streamix")
         .build();

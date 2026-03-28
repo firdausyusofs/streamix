@@ -1,5 +1,5 @@
 use adw::prelude::*;
-use gtk::{ListBox, Stack, prelude::*};
+use gtk::{ListBox, Stack};
 use adw::{ActionRow, NavigationPage, NavigationView, StatusPage};
 use gtk::{Overlay, Picture, Box, Button, Label};
 
@@ -263,6 +263,7 @@ pub fn build_details_page(movie: &MetaPreview, nav_view: &NavigationView) -> Nav
                     .clone()
                     .or(stream.info_hash.clone())
                     .unwrap_or_else(|| "Unavailable".to_string());
+                let file_idx = stream.file_idx.clone();
 
                 let row = ActionRow::builder()
                     .title(&name)
@@ -279,9 +280,25 @@ pub fn build_details_page(movie: &MetaPreview, nav_view: &NavigationView) -> Nav
                     .valign(gtk::Align::Center)
                     .build();
 
-                let play_target_btn = play_target.clone();
+                let play_target = play_target.clone();
                 play_btn.connect_clicked(move |_| {
-                    println!("Play stream: {}", play_target_btn);
+                    let target = play_target.clone();
+                    let file_idx = file_idx.clone();
+
+                    let target_clone = target.clone();
+                    crate::RUNTIME.get().unwrap().spawn(async move {
+                        if let Some(stream_url) = crate::stremio::torrent::start_stream(&target, file_idx).await {
+                            let mut mpv_process = tokio::process::Command::new("mpv")
+                                .arg(&stream_url)
+                                .spawn()
+                                .expect("Failed to launch mpv");
+
+                            let _ = mpv_process.wait();
+                        } else {
+                            eprintln!("Failed to start stream for target: {}", target_clone);
+                        }
+                    });
+
                 });
 
                 row.add_suffix(&play_btn);
