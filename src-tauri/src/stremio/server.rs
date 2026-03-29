@@ -66,7 +66,7 @@ async fn stream_handler(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    let mut response = Response::builder()
+    let response = Response::builder()
         .status(if start == 0 && end == total_len - 1 { StatusCode::OK } else { StatusCode::PARTIAL_CONTENT })
         .header(header::ACCEPT_RANGES, "bytes")
         .header(header::CONTENT_TYPE, "application/octet-stream")

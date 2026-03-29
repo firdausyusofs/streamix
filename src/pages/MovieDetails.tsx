@@ -74,13 +74,13 @@ export function MovieDetails() {
             )}
 
             <div className="metadata-row">
-              <span>{movie.year}</span>
+              <span>{movie.releaseInfo}</span>
               <span className="metadata-dot">●</span>
               <span>{movie.runtime || "N/A"}</span>
-              {movie.genre && movie.genre.length > 0 && (
+              {movie.genres && movie.genres.length > 0 && (
                 <>
                   <span className="metadata-dot">●</span>
-                  <span>{movie.genre.slice(0, 3).join(", ")}</span>
+                  <span>{movie.genres.slice(0, 3).join(", ")}</span>
                 </>
               )}
             </div>

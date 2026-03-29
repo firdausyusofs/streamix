@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Debug, Deserialize, Clone)]
@@ -78,21 +79,26 @@ pub struct CatalogResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct MetaPreview {
     pub id: String,
+    #[serde(default)]
     pub name: String,
     pub description: String,
     #[serde(rename = "type")]
     pub item_type: String,
-    pub year: String,
-    pub runtime: String,
+    // pub year: String,
+    #[serde(default)]
+    pub release_info: Option<String>,
+    pub runtime: Option<String>,
+    pub released: Option<DateTime<Utc>>,
     #[serde(rename = "cast")]
     pub casts: Vec<String>,
-    #[serde(rename = "genre")]
+    #[serde(default)]
     pub genres: Vec<String>,
-    pub poster: String,
-    pub background: String,
-    pub logo: String,
+    pub poster: Option<String>,
+    pub background: Option<String>,
+    pub logo: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

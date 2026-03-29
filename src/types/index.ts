@@ -30,10 +30,11 @@ export interface MetaPreview {
   name: string;
   description: string;
   type: string;
-  year: string;
+  releaseInfo: string | null;
   runtime: string;
+  released: Date | string | null;
   cast: string[];
-  genre: string[];
+  genres: string[];
   poster: string;
   background: string;
   logo: string;

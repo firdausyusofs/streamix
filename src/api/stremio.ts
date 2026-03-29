@@ -1,7 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { AddonConfig, CatalogResponse, InstalledAddon, MetaPreview, Stream, StreamResponse } from "../types";
 
-export async function fetchDynamicCatalog(): Promise<MetaPreview[]> {
+export interface HomeCatalog {
+  movies: MetaPreview[];
+  series: MetaPreview[];
+}
+
+export async function fetchHomeCatalogs(): Promise<HomeCatalog> {
   const config: AddonConfig = await invoke("get_installed_addons");
 
   if (!config.addons || config.addons.length === 0) {
@@ -9,19 +14,30 @@ export async function fetchDynamicCatalog(): Promise<MetaPreview[]> {
   }
 
   const mainAddon = config.addons[0];
+
   const movieCatalog = mainAddon.manifest.catalogs.find(c => c.type === "movie");
+  const seriesCatalog = mainAddon.manifest.catalogs.find(c => c.type === "series");
 
-  if (!movieCatalog) {
-    throw new Error(`Addon ${mainAddon.manifest.name} does not have a movie catalog`);
-  }
+  const fetchCat = async (catalog?: { type: string; id: string }) => {
+    if (!catalog) return [];
+    try {
+      const response: CatalogResponse = await invoke("fetch_catalog_from_addon", {
+        manifestUrl: mainAddon.transport_url,
+        itemType: catalog.type,
+        catalogId: catalog.id,
+      });
+      return response.metas || [];
+    } catch (err) {
+      return [];
+    }
+  };
 
-  const response: CatalogResponse = await invoke("fetch_catalog_from_addon", {
-    manifestUrl: mainAddon.transport_url,
-    itemType: movieCatalog.type,
-    catalogId: movieCatalog.id,
-  });
+  const [movies, series] = await Promise.all([
+    fetchCat(movieCatalog),
+    fetchCat(seriesCatalog)
+  ]);
 
-  return response.metas;
+  return { movies, series };
 };
 
 export async function fetchStreams(itemType: string, id: string): Promise<Stream[]> {
