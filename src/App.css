@@ -268,144 +268,285 @@ header h1 {
 }
 .error { color: #f87171; }
 
+/* ── Details page ─────────────────────────────── */
 .details-page {
   position: relative;
   min-height: 100vh;
-  /* Pull the page up so the background goes behind the header if you want,
-     or just let it fill the space. */
-  margin-top: -24px;
 }
 
-/* The massive background image */
 .hero-banner {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
-  height: 70vh; /* Takes up 70% of the screen height */
+  height: 75vh;
   background-size: cover;
   background-position: top center;
   z-index: 0;
-  opacity: 0.6; /* Dim it slightly so it's not overpowering */
-
-  /* Safari fix to prevent weird edge bleeding */
-  -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
-  mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+  opacity: 0.45;
+  -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
 }
 
-/* A gradient overlay that fades the bottom of the image into your app's background color */
 .hero-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, transparent 0%, rgba(7, 5, 17, 0.8) 60%, var(--bg-color) 100%);
+  background: linear-gradient(to bottom, rgba(7, 5, 17, 0.3) 0%, rgba(7, 5, 17, 0.85) 60%, var(--bg-color) 100%);
 }
 
-/* The actual content that sits on top of the background */
 .details-content {
   position: relative;
   z-index: 10;
-  padding: 40px;
+  padding: 100px 48px 60px;
   max-width: 1400px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 40px;
+  gap: 48px;
 }
 
-/* The layout of the top section (Poster + Info) */
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--surface-border);
+  color: var(--text-primary);
+  padding: 8px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  backdrop-filter: blur(12px);
+  transition: background 0.2s ease, border-color 0.2s ease;
+  width: fit-content;
+}
+
+.btn-back:hover {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.45);
+}
+
 .details-header-grid {
   display: flex;
   gap: 40px;
-  align-items: flex-end; /* Align the poster and the text to the bottom */
-  margin-top: 20vh; /* Push the content down so you can see the background! */
-}
-
-/* The Logo styling */
-.movie-logo {
-  max-width: 400px; /* Don't let logos get ridiculously huge */
-  max-height: 150px;
-  object-fit: contain;
-  object-position: left bottom;
-  margin-bottom: 16px;
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.8)); /* Make it pop against the background */
-}
-
-/* Fallback Title styling */
-.movie-title-text {
-  font-size: 3.5rem;
-  font-weight: 800;
-  line-height: 1.1;
-  margin: 0 0 16px 0;
-  text-shadow: 0 4px 12px rgba(0,0,0,0.8);
+  align-items: flex-end;
+  margin-top: 18vh;
 }
 
 .details-poster {
-  width: 300px;
+  width: 260px;
   border-radius: 16px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1);
   flex-shrink: 0;
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 246, 0.25),
+    0 24px 60px rgba(0, 0, 0, 0.7),
+    0 0 50px rgba(109, 40, 217, 0.2);
+}
+
+.movie-logo {
+  max-width: 380px;
+  max-height: 140px;
+  object-fit: contain;
+  object-position: left bottom;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.9));
+}
+
+.movie-title-text {
+  font-size: 3.2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0 0 16px 0;
+  background: linear-gradient(135deg, #f0eeff 0%, #c4b5fd 55%, #67e8f9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .metadata-row {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: center;
-  color: #cbd5e1;
-  font-size: 1.1rem;
+  flex-wrap: wrap;
+  color: var(--text-secondary);
+  font-size: 1rem;
   font-weight: 500;
-  margin-bottom: 24px;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  margin-bottom: 20px;
 }
 
 .metadata-dot {
-  color: #64748b;
-  font-size: 0.8rem;
+  color: var(--accent-violet);
+  font-size: 0.45rem;
 }
 
 .details-description {
-  font-size: 1.15rem;
-  line-height: 1.6;
-  color: #e2e8f0;
-  max-width: 800px;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: rgba(200, 190, 230, 0.85);
+  max-width: 760px;
+  margin: 0;
 }
 
-.catalog-section {
+.details-starring {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 12px 0 0;
+  line-height: 1.5;
+}
+
+.details-starring strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ── Streams section ──────────────────────────── */
+.streams-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
 }
 
-.section-header {
+.streams-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  padding-bottom: 12px;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--surface-border);
+  padding-bottom: 14px;
+  margin-bottom: 20px;
+  position: relative;
 }
 
-.section-header h2 {
+.streams-header::before {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent-violet), transparent);
+}
+
+.streams-header h2 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.5px;
+  letter-spacing: -0.3px;
 }
 
-/* THE SEE ALL BUTTON */
-.see-all-btn {
-  background: transparent;
-  border: none;
-  color: #3b82f6; /* Accent color */
-  font-size: 0.95rem;
+.streams-count {
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: #a78bfa;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 20px;
+}
+
+.streams-loading {
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+/* Addon filter pills */
+.addon-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.addon-pill {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.83rem;
   font-weight: 600;
   cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 6px;
-  transition: background 0.2s ease, color 0.2s ease;
+  border: 1px solid var(--surface-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  backdrop-filter: blur(8px);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
-.see-all-btn:hover {
-  background: rgba(59, 130, 246, 0.1); /* Light blue highlight */
-  color: #60a5fa;
+.addon-pill:hover {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.35);
+  color: #a78bfa;
+}
+
+.addon-pill.active {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.55);
+  color: #c4b5fd;
+}
+
+/* Stream cards grid */
+.streams-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.stream-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--surface-border);
+  padding: 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.stream-card:hover {
+  transform: scale(1.02);
+  border-color: rgba(139, 92, 246, 0.45);
+  background: rgba(139, 92, 246, 0.07);
+}
+
+.stream-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.stream-name {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.stream-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(236, 72, 153, 0.2));
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  color: #c4b5fd;
+  flex-shrink: 0;
+}
+
+.stream-title {
+  font-size: 0.83rem;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.streams-empty {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
 }
