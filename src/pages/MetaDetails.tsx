@@ -4,6 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchStreams, playStream } from "../api/stremio";
 import { Player } from "../components/Player";
 
+/** Parse "2h 30min", "120 min", "1 hr 45 m" → seconds */
+function parseRuntime(runtime?: string | null): number {
+  if (!runtime) return 0;
+  const h = runtime.match(/(\d+)\s*h/i)?.[1];
+  const m = runtime.match(/(\d+)\s*m/i)?.[1];
+  return (h ? +h * 3600 : 0) + (m ? +m * 60 : 0);
+}
+
 export function MetaDetails() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -100,6 +108,7 @@ export function MetaDetails() {
           streamUrl={activeStreamUrl}
           title={meta?.name || "Playing Video"}
           onClose={() => setActiveStreamUrl(null)}
+          duration={parseRuntime(meta?.runtime)}
         />
       )}
 

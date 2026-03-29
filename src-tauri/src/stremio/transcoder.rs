@@ -43,7 +43,7 @@ pub async fn prepare_stream(
     let mut ffmpeg = Command::new("ffmpeg");
     ffmpeg.args(&["-i", raw_stream_url]);
 
-    ffmpeg.arg("-sn");
+    // ffmpeg.arg("-sn");
 
     if video_codec == "h264" {
         println!("⚡ Direct Stream (Remuxing H264 to HLS)");
