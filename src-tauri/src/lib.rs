@@ -1,3 +1,5 @@
+use stremio::models::PlayStreamRequest;
+
 pub mod stremio;
 
 #[tauri::command]
@@ -34,14 +36,40 @@ async fn fetch_streams_from_addon(
     }
 }
 
+#[tauri::command]
+async fn play_stream_command(stream: PlayStreamRequest) -> Result<String, String> {
+    if let Some(url) = stream.url {
+        println!("Direct stream URL provided: {}", url);
+        return Ok(url);
+    }
+
+    if let Some(info_hash) = stream.info_hash {
+        println!("Requesting torrent stream for hash: {}", info_hash);
+
+        match crate::stremio::torrent::start_stream(&info_hash, stream.file_idx).await {
+            Some(url) => return Ok(url),
+            None => return Err("Failed to initialize torrent stream".to_string()),
+        }
+    }
+
+    Err("Invalid stream request: No URL or infoHash provided".to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|_app| {
+            tauri::async_runtime::spawn(async move {
+                crate::stremio::server::start_server().await;
+            });
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             get_installed_addons,
             fetch_catalog_from_addon,
-            fetch_streams_from_addon
+            fetch_streams_from_addon,
+            play_stream_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -94,3 +94,19 @@ export async function fetchStreams(itemType: string, id: string): Promise<Stream
 
   return allStreams;
 };
+
+export async function playStream(stream: Stream) {
+  try {
+    const url: string = await invoke("play_stream_command", {
+      stream: {
+        url: stream.url,
+        infoHash: stream.infoHash,
+        fileIdx: stream.fileIdx
+      }
+    });
+    return url;
+  } catch (err) {
+    console.error("Failed to start stream:", err);
+    throw err;
+  }
+};

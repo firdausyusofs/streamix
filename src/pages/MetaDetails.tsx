@@ -1,7 +1,8 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { MetaItem, Stream, Video } from "../types";
 import { useEffect, useMemo, useState } from "react";
-import { fetchStreams } from "../api/stremio";
+import { fetchStreams, playStream } from "../api/stremio";
+import { Player } from "../components/Player";
 
 export function MetaDetails() {
   const location = useLocation();
@@ -17,6 +18,9 @@ export function MetaDetails() {
   const [selectedEpisode, setSelectedEpisode] = useState<Video | null>(null);
 
   const [selectedAddon, setSelectedAddon] = useState<string>("All");
+
+  const [activeStreamUrl, setActiveStreamUrl] = useState<string | null>(null);
+  const [isStartingStream, setIsStartingStream] = useState<boolean>(false);
 
   const availableSeasons = useMemo(() => {
     if (meta.type !== "series" || !meta.videos) return [];
@@ -66,10 +70,42 @@ export function MetaDetails() {
     return streams.filter(s => s.addonName === selectedAddon);
   }, [streams, selectedAddon]);
 
+  const handleStreamClick = async (stream: Stream) => {
+    setIsStartingStream(true);
+    try {
+      // Calls your Rust torrent.rs start_stream function!
+      const url = await playStream(stream);
+      console.log("Got playable URL from Rust:", url);
+      setActiveStreamUrl(url); // Mounts the <video> player overlay
+    } catch (err: any) {
+      alert(`Error starting stream: ${err.message}`);
+    } finally {
+      setIsStartingStream(false);
+    }
+  };
+
   if (!meta) return <div className="status-screen">No movie found. Please go back and select a movie.</div>;
 
   return (
     <div className="details-page">
+
+      {activeStreamUrl && (
+        <Player
+          streamUrl={activeStreamUrl}
+          title={meta?.name || "Playing Video"}
+          onClose={() => setActiveStreamUrl(null)}
+        />
+      )}
+
+      {isStartingStream && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 9998,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "white"
+        }}>
+          <h2>Connecting to Swarm... 🚀</h2>
+          <p style={{ color: "#94a3b8" }}>Downloading metadata and buffering video...</p>
+        </div>
+      )}
 
       <div
         className="hero-banner"
@@ -205,7 +241,7 @@ export function MetaDetails() {
                 <div
                   key={idx}
                   className="stream-card"
-                  onClick={() => alert(`Starting torrent: ${stream.infoHash}`)}
+                  onClick={() => handleStreamClick(stream)}
                 >
                   <div className="stream-card-header">
                     <h4 className="stream-name">{stream.name || "Torrent"}</h4>

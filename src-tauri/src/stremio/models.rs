@@ -146,3 +146,11 @@ pub struct Stream {
     pub info_hash: Option<String>,
     pub file_idx: Option<u32>,
 }
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayStreamRequest {
+    pub url: Option<String>,
+    pub info_hash: Option<String>,
+    pub file_idx: Option<u32>,
+}
