@@ -1,14 +1,39 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MetaPreview } from "../types";
 import { MovieCard } from "../components/MovieCard";
 import { fetchHomeCatalogs, HomeCatalog } from "../api/stremio";
 import { useNavigate } from "react-router";
+
+const MIN_CARD_WIDTH = 220;
+const GRID_GAP = 24;
+
+function useCardsPerRow(): [React.RefCallback<HTMLDivElement>, number] {
+  const [count, setCount] = useState(9);
+  const observerRef = useRef<ResizeObserver | null>(null);
+
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    observerRef.current?.disconnect();
+    observerRef.current = null;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width;
+      const fit = Math.floor((width + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP));
+      setCount(Math.max(1, fit));
+    });
+    observer.observe(el);
+    observerRef.current = observer;
+  }, []);
+
+  return [ref, count];
+}
 
 export function Catalog() {
   const navigate = useNavigate();
   const [catalogs, setCatalogs] = useState<HomeCatalog>({ movies: [], series: [] });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [moviesGridRef, moviesPerRow] = useCardsPerRow();
+  const [seriesGridRef, seriesPerRow] = useCardsPerRow();
 
   useEffect(() => {
     fetchHomeCatalogs()
@@ -45,9 +70,8 @@ return (
               See All
             </button>
           </div>
-          <div className="movie-grid">
-            {/* ONLY slice the first 9 movies! */}
-            {catalogs.movies.slice(0, 9).map((movie) => (
+          <div className="movie-grid" ref={moviesGridRef}>
+            {catalogs.movies.slice(0, moviesPerRow).map((movie) => (
               <MovieCard key={movie.id} movie={movie} onClick={handleMovieClick} />
             ))}
           </div>
@@ -63,9 +87,8 @@ return (
               See All
             </button>
           </div>
-          <div className="movie-grid">
-            {/* ONLY slice the first 9 series! */}
-            {catalogs.series.slice(0, 9).map((series) => (
+          <div className="movie-grid" ref={seriesGridRef}>
+            {catalogs.series.slice(0, seriesPerRow).map((series) => (
               <MovieCard key={series.id} movie={series} onClick={handleMovieClick} />
             ))}
           </div>

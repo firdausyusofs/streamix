@@ -65,10 +65,14 @@ header h1 {
 }
 
 .movie-grid {
-  display: grid;
-  /* Scales beautifully on any window size */
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 32px 24px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 24px;
+}
+
+.movie-grid .movie-card {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 /* Premium Movie Cards */
@@ -77,12 +81,6 @@ header h1 {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  transition: transform var(--transition-speed) cubic-bezier(0.25, 1, 0.5, 1);
-}
-
-/* Pop-out effect on hover */
-.movie-card:hover {
-  transform: translateY(-8px) scale(1.03);
 }
 
 .poster-wrapper {
@@ -93,12 +91,18 @@ header h1 {
   overflow: hidden;
   background-color: var(--surface-color);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-  transition: box-shadow 0.25s ease;
+  transition:
+    transform var(--transition-speed) cubic-bezier(0.25, 1, 0.5, 1),
+    box-shadow 0.25s ease;
 
   /* Safari/Webkit fix to ensure border-radius doesn't break during transforms */
   -webkit-backface-visibility: hidden;
   -moz-backface-visibility: hidden;
-  transform: translate3d(0, 0, 0);
+}
+
+/* Pop-out effect on hover — applied to child so the hover hitbox doesn't move */
+.movie-card:hover .poster-wrapper {
+  transform: translateY(-8px) scale(1.03);
 }
 
 .poster-wrapper img {
@@ -139,9 +143,12 @@ header h1 {
   font-size: 1.05rem;
   font-weight: 600;
   color: var(--text-primary);
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
+  min-height: calc(1.05rem * 1.35 * 2); /* reserve space for 2 lines always */
 }
 
 .movie-info span {
