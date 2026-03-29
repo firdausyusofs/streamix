@@ -1,9 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
-import { AddonConfig, CatalogResponse, InstalledAddon, MetaPreview, Stream, StreamResponse } from "../types";
+import { AddonConfig, CatalogResponse, InstalledAddon, MetaItem, Stream, StreamResponse } from "../types";
 
 export interface HomeCatalog {
-  movies: MetaPreview[];
-  series: MetaPreview[];
+  movies: MetaItem[];
+  series: MetaItem[];
 }
 
 export async function fetchHomeCatalogs(): Promise<HomeCatalog> {
@@ -26,7 +26,14 @@ export async function fetchHomeCatalogs(): Promise<HomeCatalog> {
         itemType: catalog.type,
         catalogId: catalog.id,
       });
-      return response.metas || [];
+      return (response.metas || []).map((meta) => ({
+        ...meta,
+        released: meta.released ? new Date(meta.released) : null,
+        videos: meta.videos.map((video) => ({
+          ...video,
+          released: video.released ? new Date(video.released) : null,
+        }))
+      }));
     } catch (err) {
       return [];
     }

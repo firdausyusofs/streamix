@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MetaPreview } from "../types";
-import { MovieCard } from "../components/MovieCard";
+import { MetaItem } from "../types";
+import { MetaCard } from "../components/MetaCard";
 import { fetchHomeCatalogs, HomeCatalog } from "../api/stremio";
 import { useNavigate } from "react-router";
 
@@ -42,8 +42,8 @@ export function Catalog() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleMovieClick = (movie: MetaPreview) => {
-    navigate(`/movie/${movie.id}`, { state: { movie } });
+  const handleMovieClick = (meta: MetaItem) => {
+    navigate(`/meta/${meta.id}`, { state: { meta } });
   };
 
   const handleSeeAll = (type: "movies" | "series") => {
@@ -70,9 +70,9 @@ return (
               See All
             </button>
           </div>
-          <div className="movie-grid" ref={moviesGridRef}>
+          <div className="meta-grid" ref={moviesGridRef}>
             {catalogs.movies.slice(0, moviesPerRow).map((movie) => (
-              <MovieCard key={movie.id} movie={movie} onClick={handleMovieClick} />
+              <MetaCard key={movie.id} meta={movie} onClick={handleMovieClick} />
             ))}
           </div>
         </section>
@@ -87,9 +87,9 @@ return (
               See All
             </button>
           </div>
-          <div className="movie-grid" ref={seriesGridRef}>
+          <div className="meta-grid" ref={seriesGridRef}>
             {catalogs.series.slice(0, seriesPerRow).map((series) => (
-              <MovieCard key={series.id} movie={series} onClick={handleMovieClick} />
+              <MetaCard key={series.id} meta={series} onClick={handleMovieClick} />
             ))}
           </div>
         </section>

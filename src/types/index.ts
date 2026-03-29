@@ -40,8 +40,22 @@ export interface MetaPreview {
   logo: string;
 };
 
+export interface Video {
+  id: string,
+  title: string,
+  overview: string | null,
+  released: Date | string | null,
+  thumbnail: string | null,
+  season?: number,
+  episode?: number,
+};
+
+export interface MetaItem extends MetaPreview {
+  videos: Video[];
+};
+
 export interface CatalogResponse {
-  metas: MetaPreview[];
+  metas: MetaItem[];
 };
 
 export interface Stream {

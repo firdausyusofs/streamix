@@ -147,20 +147,20 @@ header h1 {
   color: #c4b5fd;
 }
 
-/* ── Movie Grid ───────────────────────────────── */
-.movie-grid {
+/* ── Meta Grid ───────────────────────────────── */
+.meta-grid {
   display: flex;
   flex-wrap: nowrap;
   gap: 16px;
 }
 
-.movie-grid .movie-card {
+.meta-grid .meta-card {
   flex: 1 1 0;
   min-width: 0;
 }
 
-/* ── Movie Card ───────────────────────────────── */
-.movie-card {
+/* ── Meta Card ───────────────────────────────── */
+.meta-card {
   cursor: pointer;
   position: relative;
   aspect-ratio: 2 / 3;
@@ -174,7 +174,7 @@ header h1 {
     box-shadow var(--transition-speed) ease;
 }
 
-.movie-card:hover {
+.meta-card:hover {
   transform: scale(1.04);
   box-shadow:
     0 0 0 1.5px rgba(139, 92, 246, 0.7),
@@ -198,7 +198,7 @@ header h1 {
   transition: transform var(--transition-speed) cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.movie-card:hover .poster-wrapper img {
+.meta-card:hover .poster-wrapper img {
   transform: scale(1.06);
 }
 
@@ -216,7 +216,7 @@ header h1 {
 }
 
 /* Gradient overlay — always present, info sits on top of it */
-.movie-info {
+.meta-info {
   position: absolute;
   bottom: 0;
   left: 0;
@@ -233,7 +233,7 @@ header h1 {
   gap: 3px;
 }
 
-.movie-info h3 {
+.meta-info h3 {
   margin: 0;
   font-size: 0.9rem;
   font-weight: 600;
@@ -246,7 +246,7 @@ header h1 {
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
 
-.movie-info span {
+.meta-info span {
   color: rgba(180, 170, 210, 0.8);
   font-size: 0.75rem;
   font-weight: 500;
@@ -344,7 +344,7 @@ header h1 {
     0 0 50px rgba(109, 40, 217, 0.2);
 }
 
-.movie-logo {
+.meta-logo {
   max-width: 380px;
   max-height: 140px;
   object-fit: contain;
@@ -353,7 +353,7 @@ header h1 {
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.9));
 }
 
-.movie-title-text {
+.meta-title-text {
   font-size: 3.2rem;
   font-weight: 800;
   line-height: 1.1;

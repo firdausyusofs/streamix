@@ -75,7 +75,7 @@ pub struct CatalogDescriptor {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CatalogResponse {
-    pub metas: Vec<MetaPreview>,
+    pub metas: Vec<MetaItem>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -99,6 +99,37 @@ pub struct MetaPreview {
     pub poster: Option<String>,
     pub background: Option<String>,
     pub logo: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SeriesInfo {
+    pub season: u32,
+    pub episode: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Video {
+    pub id: String,
+    #[serde(default, alias = "name")]
+    pub title: String,
+    #[serde(default)]
+    pub released: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub overview: Option<String>,
+    #[serde(default)]
+    pub thumbnail: Option<String>,
+    #[serde(default, flatten)]
+    pub series_info: Option<SeriesInfo>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MetaItem {
+    #[serde(flatten)]
+    pub preview: MetaPreview,
+    #[serde(default)]
+    pub videos: Vec<Video>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
