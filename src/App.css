@@ -1,14 +1,17 @@
 :root {
-  --bg-color: #0b0f19; /* Deep, immersive dark blue/black */
-  --surface-color: #1a2235;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --accent-color: #3b82f6; /* A nice modern blue */
-  --card-radius: 12px;
-  --transition-speed: 0.3s;
+  --bg-color: #070511;
+  --surface-color: rgba(255, 255, 255, 0.06);
+  --surface-border: rgba(255, 255, 255, 0.09);
+  --text-primary: #f0eeff;
+  --text-secondary: #8b82b0;
+  --accent-violet: #8b5cf6;
+  --accent-pink: #ec4899;
+  --accent-cyan: #22d3ee;
+  --card-radius: 14px;
+  --transition-speed: 0.35s;
 }
 
-/* Global Native App Feel */
+/* Global */
 body {
   background-color: var(--bg-color);
   color: var(--text-primary);
@@ -16,58 +19,139 @@ body {
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
-  /* Hide the scrollbar but keep scrolling for a native feel */
   scrollbar-width: none;
+  overflow-x: hidden;
 }
-body::-webkit-scrollbar {
-  display: none;
+body::-webkit-scrollbar { display: none; }
+
+/* Atmospheric background blobs */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(120px);
+  pointer-events: none;
+  z-index: 0;
+}
+body::before {
+  width: 700px;
+  height: 700px;
+  top: -200px;
+  left: -150px;
+  background: radial-gradient(circle, rgba(109, 40, 217, 0.35) 0%, transparent 70%);
+}
+body::after {
+  width: 600px;
+  height: 600px;
+  bottom: -100px;
+  right: -100px;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.2) 0%, transparent 70%);
 }
 
 .app-container {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-/* Glassmorphism Header */
+/* ── Header ─────────────────────────────────── */
 header {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   z-index: 100;
-  padding: 24px 40px;
-  background: rgba(11, 15, 25, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 20px 40px;
+  background: rgba(7, 5, 17, 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--surface-border);
+  box-sizing: border-box;
 }
 
 header h1 {
   margin: 0;
   font-size: 1.75rem;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: -0.5px;
-  /* background: linear-gradient(to right, #fff, #94a3b8); */
-  /* -webkit-background-clip: text; */
-  /* -webkit-text-fill-color: transparent; */
+  background: linear-gradient(135deg, #e0d7ff 0%, #a78bfa 50%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .brand-accent {
-  /* Make the 'ix' in Streamix a cool blue */
-  color: #3b82f6;
+  /* gradient handles colouring, this just keeps the span semantic */
 }
 
-/* The Grid */
+/* ── Page layout ─────────────────────────────── */
 .page-content {
-  padding: 32px 40px;
-  padding-top: 120px; /* Account for fixed header */
+  padding: 32px 40px 60px;
+  padding-top: 110px;
 }
 
+/* ── Section ─────────────────────────────────── */
+.catalog-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--surface-border);
+  position: relative;
+}
+
+/* glowing left accent line */
+.section-header::before {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent-violet), transparent);
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+}
+
+.see-all-btn {
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: #a78bfa;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 16px;
+  border-radius: 20px;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  letter-spacing: 0.2px;
+}
+
+.see-all-btn:hover {
+  background: rgba(139, 92, 246, 0.25);
+  border-color: rgba(167, 139, 250, 0.6);
+  color: #c4b5fd;
+}
+
+/* ── Movie Grid ───────────────────────────────── */
 .movie-grid {
   display: flex;
   flex-wrap: nowrap;
-  gap: 24px;
+  gap: 16px;
 }
 
 .movie-grid .movie-card {
@@ -75,34 +159,35 @@ header h1 {
   min-width: 0;
 }
 
-/* Premium Movie Cards */
+/* ── Movie Card ───────────────────────────────── */
 .movie-card {
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.poster-wrapper {
   position: relative;
-  width: 100%;
   aspect-ratio: 2 / 3;
-  border-radius: 12px;
+  border-radius: var(--card-radius);
   overflow: hidden;
-  background-color: var(--surface-color);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  /* Scale the whole card — safe from glitch (grows toward cursor, never away) */
   transition:
     transform var(--transition-speed) cubic-bezier(0.25, 1, 0.5, 1),
-    box-shadow 0.25s ease;
-
-  /* Safari/Webkit fix to ensure border-radius doesn't break during transforms */
-  -webkit-backface-visibility: hidden;
-  -moz-backface-visibility: hidden;
+    box-shadow var(--transition-speed) ease;
 }
 
-/* Pop-out effect on hover — applied to child so the hover hitbox doesn't move */
-.movie-card:hover .poster-wrapper {
-  transform: translateY(-8px) scale(1.03);
+.movie-card:hover {
+  transform: scale(1.04);
+  box-shadow:
+    0 0 0 1.5px rgba(139, 92, 246, 0.7),
+    0 8px 40px rgba(109, 40, 217, 0.35),
+    0 0 70px rgba(236, 72, 153, 0.12),
+    0 16px 48px rgba(0, 0, 0, 0.7);
+}
+
+/* Poster fills the entire card */
+.poster-wrapper {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
 }
 
 .poster-wrapper img {
@@ -110,54 +195,68 @@ header h1 {
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: transform var(--transition-speed) cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.movie-card:hover .poster-wrapper {
-  /* Layer 1: A bright, tight ring right on the edge (like a 1px border)
-    Layer 2: A wide, soft, lighter glow spreading outward
-    Layer 3: A standard drop shadow below it to keep depth
-  */
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.3),
-    0 0 100px rgba(255, 255, 255, 0.15),
-    0 12px 24px rgba(0, 0, 0, 0.6);
+.movie-card:hover .poster-wrapper img {
+  transform: scale(1.06);
 }
 
-/* .poster-wrapper img { */
-/*   width: 100%; */
-/*   height: 100%; */
-/*   object-fit: cover; */
-/*   display: block; */
-/*   transition: transform var(--transition-speed) ease; */
-/* } */
+.poster-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  padding: 12px;
+  box-sizing: border-box;
+  text-align: center;
+}
 
+/* Gradient overlay — always present, info sits on top of it */
 .movie-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 48px 12px 14px;
+  background: linear-gradient(
+    to top,
+    rgba(7, 5, 17, 0.97) 0%,
+    rgba(7, 5, 17, 0.75) 45%,
+    transparent 100%
+  );
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 0 4px;
+  gap: 3px;
 }
 
 .movie-info h3 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #f0eeff;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   line-height: 1.35;
-  min-height: calc(1.05rem * 1.35 * 2); /* reserve space for 2 lines always */
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
 
 .movie-info span {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+  color: rgba(180, 170, 210, 0.8);
+  font-size: 0.75rem;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
 
-/* Loading & Error Screens */
+/* ── Status screens ───────────────────────────── */
 .status-screen {
   display: flex;
   justify-content: center;
@@ -167,9 +266,7 @@ header h1 {
   color: var(--text-secondary);
   font-weight: 500;
 }
-.error {
-  color: #ef4444;
-}
+.error { color: #f87171; }
 
 .details-page {
   position: relative;
@@ -200,7 +297,7 @@ header h1 {
 .hero-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, transparent 0%, rgba(11, 15, 25, 0.8) 60%, var(--bg-color) 100%);
+  background: linear-gradient(to bottom, transparent 0%, rgba(7, 5, 17, 0.8) 60%, var(--bg-color) 100%);
 }
 
 /* The actual content that sits on top of the background */
