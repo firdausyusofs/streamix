@@ -49,6 +49,7 @@ export interface Stream {
   url?: string;
   infoHash?: string;
   fileIdx?: number;
+  addonName?: string;
 };
 
 export interface StreamResponse {

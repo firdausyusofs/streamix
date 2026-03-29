@@ -24,7 +24,7 @@ export async function fetchDynamicCatalog(): Promise<MetaPreview[]> {
   return response.metas;
 };
 
-export async function fetchMovieStreams(itemType: string, id: string): Promise<Stream[]> {
+export async function fetchStreams(itemType: string, id: string): Promise<Stream[]> {
   const config: AddonConfig = await invoke("get_installed_addons");
 
   const streamAddons = config.addons.filter((a: InstalledAddon) => {
@@ -48,7 +48,7 @@ export async function fetchMovieStreams(itemType: string, id: string): Promise<S
     throw new Error("No addon with stream resource found");
   }
 
-  const fetchPromises = streamAddons.map(async (addon: InstalledAddon) => {
+  const fetchPromises = streamAddons.map(async (addon: InstalledAddon): Promise<Stream[]> => {
     try {
       const response: StreamResponse = await invoke("fetch_streams_from_addon", {
         manifestUrl: addon.transport_url,

@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { MetaPreview, Stream } from "../types";
 import { useEffect, useMemo, useState } from "react";
-import { fetchMovieStreams } from "../api/stremio";
+import { fetchStreams } from "../api/stremio";
 
 export function MovieDetails() {
   const location = useLocation();
@@ -23,7 +23,7 @@ export function MovieDetails() {
     setError(null);
     setSelectedAddon("All");
 
-    fetchMovieStreams(movie.type, movie.id)
+    fetchStreams(movie.type, movie.id)
       .then(res => setStreams(res || []))
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
