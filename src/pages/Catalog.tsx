@@ -35,23 +35,41 @@ export function Catalog() {
   const [moviesGridRef, moviesPerRow] = useCardsPerRow();
   const [seriesGridRef, seriesPerRow] = useCardsPerRow();
 
-  useEffect(() => {
+  const loadCatalogs = useCallback(() => {
+    setLoading(true);
+    setError(null);
     fetchHomeCatalogs()
       .then(setCatalogs)
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { loadCatalogs(); }, [loadCatalogs]);
+
   const handleMovieClick = (meta: MetaItem) => {
     navigate(`/meta/${meta.id}`, { state: { meta } });
   };
 
-  const handleSeeAll = (type: "movies" | "series") => {
-    alert(`See all ${type} - Not implemented yet!`);
-  };
+  if (loading) return (
+    <div className="status-screen">
+      <div className="status-card">
+        <div className="spinner" />
+        <h3>Loading your catalog</h3>
+        <p>Fetching addons and titles…</p>
+      </div>
+    </div>
+  );
 
-  if (loading) return <div className="status-screen">Loading Addons & Movies...</div>;
-  if (error) return <div className="status-screen error">Error: {error}</div>;
+  if (error) return (
+    <div className="status-screen">
+      <div className="status-card error-card">
+        <span className="status-icon">⚠</span>
+        <h3>Couldn't load catalog</h3>
+        <p>{error}</p>
+        <button className="btn-retry" onClick={loadCatalogs}>Try Again</button>
+      </div>
+    </div>
+  );
 
 return (
     <div className="page-content">
@@ -66,9 +84,6 @@ return (
         <section className="catalog-section">
           <div className="section-header">
             <h2>🔥 Top Movies</h2>
-            <button className="see-all-btn" onClick={() => handleSeeAll("movies")}>
-              See All
-            </button>
           </div>
           <div className="meta-grid" ref={moviesGridRef}>
             {catalogs.movies.slice(0, moviesPerRow).map((movie) => (
@@ -83,9 +98,6 @@ return (
         <section className="catalog-section" style={{ marginTop: "40px" }}>
           <div className="section-header">
             <h2>📺 Top Series</h2>
-            <button className="see-all-btn" onClick={() => handleSeeAll("series")}>
-              See All
-            </button>
           </div>
           <div className="meta-grid" ref={seriesGridRef}>
             {catalogs.series.slice(0, seriesPerRow).map((series) => (

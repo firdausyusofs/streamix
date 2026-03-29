@@ -21,6 +21,13 @@ export function MetaDetails() {
 
   const [activeStreamUrl, setActiveStreamUrl] = useState<string | null>(null);
   const [isStartingStream, setIsStartingStream] = useState<boolean>(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!streamError) return;
+    const t = setTimeout(() => setStreamError(null), 5000);
+    return () => clearTimeout(t);
+  }, [streamError]);
 
   const availableSeasons = useMemo(() => {
     if (meta.type !== "series" || !meta.videos) return [];
@@ -73,12 +80,11 @@ export function MetaDetails() {
   const handleStreamClick = async (stream: Stream) => {
     setIsStartingStream(true);
     try {
-      // Calls your Rust torrent.rs start_stream function!
       const url = await playStream(stream);
       console.log("Got playable URL from Rust:", url);
-      setActiveStreamUrl(url); // Mounts the <video> player overlay
+      setActiveStreamUrl(url);
     } catch (err: any) {
-      alert(`Error starting stream: ${err.message}`);
+      setStreamError(err.message || "Failed to start stream.");
     } finally {
       setIsStartingStream(false);
     }
@@ -98,12 +104,18 @@ export function MetaDetails() {
       )}
 
       {isStartingStream && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 9998,
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "white"
-        }}>
-          <h2>Connecting to Swarm... 🚀</h2>
-          <p style={{ color: "#94a3b8" }}>Downloading metadata and buffering video...</p>
+        <div className="connecting-overlay">
+          <div className="spinner" style={{ width: 48, height: 48, borderWidth: 3 }} />
+          <h2>Connecting to Swarm…</h2>
+          <p>Downloading metadata and buffering video…</p>
+        </div>
+      )}
+
+      {streamError && (
+        <div className="stream-error-toast">
+          <span>⚠</span>
+          <span>{streamError}</span>
+          <button className="toast-close" onClick={() => setStreamError(null)}>✕</button>
         </div>
       )}
 
@@ -216,10 +228,26 @@ export function MetaDetails() {
               )}
             </div>
 
-            {loading && <p className="streams-loading">Aggregating streams from your addons…</p>}
-            {error && <p className="error">{error}</p>}
+            {loading && (
+              <div className="streams-grid">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="skeleton-card">
+                    <div className="skeleton-line short" />
+                    <div className="skeleton-line medium" />
+                    <div className="skeleton-line long" />
+                  </div>
+                ))}
+              </div>
+            )}
 
-            {!loading && uniqueAddons.length > 1 && (
+            {!loading && error && (
+              <div className="error-banner">
+                <span className="error-banner-icon">⚠</span>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {!loading && !error && uniqueAddons.length > 1 && (
               <div className="addon-filters">
                 {uniqueAddons.map(addon => (
                   <button
@@ -234,10 +262,10 @@ export function MetaDetails() {
             )}
 
             <div className="streams-grid">
-              {filteredStreams.length === 0 && !loading && !error && (
+              {!loading && filteredStreams.length === 0 && !error && (
                 <p className="streams-empty">No streams found for this content.</p>
               )}
-              {filteredStreams.map((stream, idx) => (
+              {!loading && filteredStreams.map((stream, idx) => (
                 <div
                   key={idx}
                   className="stream-card"
