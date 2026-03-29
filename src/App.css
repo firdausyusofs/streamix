@@ -151,3 +151,105 @@ header h1 {
 .error {
   color: #ef4444;
 }
+
+.details-page {
+  position: relative;
+  min-height: 100vh;
+  /* Pull the page up so the background goes behind the header if you want,
+     or just let it fill the space. */
+  margin-top: -24px;
+}
+
+/* The massive background image */
+.hero-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 70vh; /* Takes up 70% of the screen height */
+  background-size: cover;
+  background-position: top center;
+  z-index: 0;
+  opacity: 0.6; /* Dim it slightly so it's not overpowering */
+
+  /* Safari fix to prevent weird edge bleeding */
+  -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+}
+
+/* A gradient overlay that fades the bottom of the image into your app's background color */
+.hero-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 0%, rgba(11, 15, 25, 0.8) 60%, var(--bg-color) 100%);
+}
+
+/* The actual content that sits on top of the background */
+.details-content {
+  position: relative;
+  z-index: 10;
+  padding: 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+/* The layout of the top section (Poster + Info) */
+.details-header-grid {
+  display: flex;
+  gap: 40px;
+  align-items: flex-end; /* Align the poster and the text to the bottom */
+  margin-top: 20vh; /* Push the content down so you can see the background! */
+}
+
+/* The Logo styling */
+.movie-logo {
+  max-width: 400px; /* Don't let logos get ridiculously huge */
+  max-height: 150px;
+  object-fit: contain;
+  object-position: left bottom;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.8)); /* Make it pop against the background */
+}
+
+/* Fallback Title styling */
+.movie-title-text {
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0 0 16px 0;
+  text-shadow: 0 4px 12px rgba(0,0,0,0.8);
+}
+
+.details-poster {
+  width: 300px;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1);
+  flex-shrink: 0;
+}
+
+.metadata-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  color: #cbd5e1;
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: 24px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.metadata-dot {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.details-description {
+  font-size: 1.15rem;
+  line-height: 1.6;
+  color: #e2e8f0;
+  max-width: 800px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}

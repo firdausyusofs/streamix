@@ -42,3 +42,15 @@ export interface MetaPreview {
 export interface CatalogResponse {
   metas: MetaPreview[];
 };
+
+export interface Stream {
+  name?: string;
+  title?: string;
+  url?: string;
+  infoHash?: string;
+  fileIdx?: number;
+};
+
+export interface StreamResponse {
+  streams: Stream[];
+}
