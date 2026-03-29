@@ -1,3 +1,4 @@
+use directories::ProjectDirs;
 use stremio::models::PlayStreamRequest;
 
 pub mod stremio;
@@ -46,10 +47,24 @@ async fn play_stream_command(stream: PlayStreamRequest) -> Result<String, String
     if let Some(info_hash) = stream.info_hash {
         println!("Requesting torrent stream for hash: {}", info_hash);
 
-        match crate::stremio::torrent::start_stream(&info_hash, stream.file_idx).await {
-            Some(url) => return Ok(url),
+        let raw_stream_url = match crate::stremio::torrent::start_stream(&info_hash, stream.file_idx).await {
+            Some(url) => url,
             None => return Err("Failed to initialize torrent stream".to_string()),
-        }
+        };
+
+        let proj_dirs = ProjectDirs::from("com", "fy", "streamix")
+            .ok_or("Could not find project directories")?;
+        let cache_dir = proj_dirs.cache_dir().join("torrents");
+
+        let hls_route = crate::stremio::transcoder::prepare_stream(&raw_stream_url, &info_hash, cache_dir)
+            .await?;
+
+        let port = crate::stremio::server::SERVER_PORT.get()
+            .ok_or("Axum server port not initialized")?;
+
+        let final_hls_url = format!("http://127.0.0.1:{}{}", port, hls_route);
+
+        return Ok(final_hls_url);
     }
 
     Err("Invalid stream request: No URL or infoHash provided".to_string())

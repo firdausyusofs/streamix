@@ -4,3 +4,4 @@ pub mod models;
 pub mod server;
 pub mod store;
 pub mod torrent;
+pub mod transcoder;

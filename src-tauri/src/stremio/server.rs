@@ -1,14 +1,28 @@
 use std::sync::OnceLock;
 
 use axum::{Router, body::Body, extract::{Path, Request}, http::Response, routing::get};
+use directories::ProjectDirs;
 use reqwest::{StatusCode, header};
 use tokio::io::AsyncSeekExt;
 use tokio_util::io::ReaderStream;
+use tower_http::{cors::{Any, CorsLayer}, services::ServeDir};
 
 pub static SERVER_PORT: OnceLock<u16> = OnceLock::new();
 
 pub async fn start_server() {
-    let app = Router::new().route("/stream/:info_hash/:file_idx", get(stream_handler));
+    let proj_dirs = ProjectDirs::from("com", "fy", "streamix").unwrap();
+    let hls_dir = proj_dirs.cache_dir().join("torrents").join("hls");
+    std::fs::create_dir_all(&hls_dir).unwrap();
+
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
+    let app = Router::new()
+        .route("/stream/:info_hash/:file_idx", get(stream_handler))
+        .nest_service("/hls", ServeDir::new(hls_dir))
+        .layer(cors);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
