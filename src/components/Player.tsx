@@ -38,12 +38,10 @@ export function Player({ streamUrl, title, onClose, duration: propDuration }: Pl
   const [fullscreen,  setFullscreen]  = useState(false);
   const [subMenu,     setSubMenu]     = useState(false);
   const [audioMenu,   setAudioMenu]   = useState(false);
-  const [subtitles,   setSubtitles]   = useState<SubtitleTrack[]>([]);
+  const [subtitles,   _setSubtitles]  = useState<SubtitleTrack[]>([]);
   const [activeSub,   setActiveSub]   = useState(-1);
-  const [audios,      setAudios]      = useState<AudioTrack[]>([]);
-  const [activeAudio, setActiveAudio] = useState(0);
-
-  const resetHide = useCallback(() => {
+  const [audios,      _setAudios]     = useState<AudioTrack[]>([]);
+  const [activeAudio, setActiveAudio] = useState(0);  const resetHide = useCallback(() => {
     setVisible(true);
     if (hideTimer.current) clearTimeout(hideTimer.current);
     hideTimer.current = setTimeout(() => setVisible(false), 3000);
@@ -78,48 +76,54 @@ export function Player({ streamUrl, title, onClose, duration: propDuration }: Pl
     video.addEventListener("volumechange",   onVol);
     video.addEventListener("durationchange", onDur);
 
-    let hls: Hls | null = null;
+    video.src = streamUrl;
 
-    if (Hls.isSupported()) {
-      hls = new Hls({ maxBufferLength: 30, startLevel: -1, startPosition: 0 });
-      hlsRef.current = hls;
-      hls.loadSource(streamUrl);
-      hls.attachMedia(video);
+    video.addEventListener("loadedmetadata", () => {
+      video.play().catch(e => console.warn("Autoplay blocked:", e));
+    });
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(e => console.warn("Autoplay blocked:", e));
-      });
+    // let hls: Hls | null = null;
 
-      // On-the-fly HLS transcoding reports Infinity for duration.
-      // LEVEL_LOADED gives us totalduration by summing all manifest segments.
-      hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
-        const total = data.details.totalduration;
-        if (total > 0 && isFinite(total) && !propDuration)
-          setDuration(prev => (prev > 0 ? prev : total));
-      });
+    // if (Hls.isSupported()) {
+    //   hls = new Hls({ maxBufferLength: 30, startLevel: -1, startPosition: 0 });
+    //   hlsRef.current = hls;
+    //   hls.loadSource(streamUrl);
+    //   hls.attachMedia(video);
 
-      hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (_, data) => {
-        setSubtitles(data.subtitleTracks.map((t, i) => ({
-          id: i, name: t.name || t.lang || `Subtitle ${i + 1}`, lang: t.lang,
-        })));
-      });
-      hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_, data) => setActiveSub(data.id));
+    //   hls.on(Hls.Events.MANIFEST_PARSED, () => {
+    //     video.play().catch(e => console.warn("Autoplay blocked:", e));
+    //   });
 
-      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_, data) => {
-        setAudios(data.audioTracks.map((t, i) => ({
-          id: i, name: t.name || t.lang || `Audio ${i + 1}`, lang: t.lang,
-        })));
-      });
-      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_, data) => setActiveAudio(data.id));
+    //   // On-the-fly HLS transcoding reports Infinity for duration.
+    //   // LEVEL_LOADED gives us totalduration by summing all manifest segments.
+    //   hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
+    //     const total = data.details.totalduration;
+    //     if (total > 0 && isFinite(total) && !propDuration)
+    //       setDuration(prev => (prev > 0 ? prev : total));
+    //   });
 
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal && data.type === Hls.ErrorTypes.MEDIA_ERROR)
-          hls!.recoverMediaError();
-      });
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = streamUrl;
-      video.addEventListener("loadedmetadata", () => video.play());
-    }
+    //   hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (_, data) => {
+    //     setSubtitles(data.subtitleTracks.map((t, i) => ({
+    //       id: i, name: t.name || t.lang || `Subtitle ${i + 1}`, lang: t.lang,
+    //     })));
+    //   });
+    //   hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_, data) => setActiveSub(data.id));
+
+    //   hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_, data) => {
+    //     setAudios(data.audioTracks.map((t, i) => ({
+    //       id: i, name: t.name || t.lang || `Audio ${i + 1}`, lang: t.lang,
+    //     })));
+    //   });
+    //   hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_, data) => setActiveAudio(data.id));
+
+    //   hls.on(Hls.Events.ERROR, (_, data) => {
+    //     if (data.fatal && data.type === Hls.ErrorTypes.MEDIA_ERROR)
+    //       hls!.recoverMediaError();
+    //   });
+    // } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    //   video.src = streamUrl;
+    //   video.addEventListener("loadedmetadata", () => video.play());
+    // }
 
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -151,7 +155,15 @@ export function Player({ streamUrl, title, onClose, duration: propDuration }: Pl
       video.removeEventListener("volumechange", onVol);
       video.removeEventListener("durationchange", onDur);
       if (hideTimer.current) clearTimeout(hideTimer.current);
-      hls?.destroy();
+
+      // Properly abort the HTTP stream connection so the server-side FFmpeg
+      // process receives the closed-pipe signal immediately.  Without this,
+      // React StrictMode's double-invoke causes the browser to open a second
+      // connection to the same URL while the first FFmpeg process is still
+      // running, resulting in duplicate "Broken pipe" errors in the console.
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
     };
   }, [streamUrl, onClose, toggleFullscreen, resetHide, propDuration]);
 

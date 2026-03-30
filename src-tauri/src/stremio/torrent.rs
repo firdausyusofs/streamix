@@ -1,84 +1,93 @@
-use std::{collections::HashMap, sync::{Arc, OnceLock, RwLock}};
+use std::{collections::HashMap, path::PathBuf, sync::{Arc, OnceLock, RwLock}};
 
-use directories::ProjectDirs;
-use librqbit::{AddTorrent, AddTorrentOptions, ManagedTorrent, Session};
-use tokio::sync::OnceCell;
+use librqbit::{AddTorrent, AddTorrentOptions, ManagedTorrent, Session, SessionOptions};
 
-pub static TORRENT_HANDLES: OnceLock<RwLock<HashMap<String, Arc<ManagedTorrent>>>> = OnceLock::new();
-pub static TORRENT_SESSION: OnceCell<Arc<Session>> = OnceCell::const_new();
-
-pub async fn get_session() -> Arc<Session> {
-    TORRENT_SESSION
-        .get_or_init(|| async {
-            let proj_dirs = ProjectDirs::from("com", "fy", "streamix").unwrap();
-            let download_dir = proj_dirs.cache_dir().join("torrents");
-
-            if let Err(e) = std::fs::create_dir_all(&download_dir) {
-                eprintln!("Failed to create torrent download directory: {}", e);
-            }
-
-            println!("Initializing torrent session with download directory: {:?}", download_dir);
-
-            let session = Session::new(download_dir)
-                .await
-                .expect("Failed to initialize torrent session");
-
-            session
-        })
-        .await
-        .clone()
+pub struct TorrentManager {
+    pub session: Arc<Session>,
+    pub cache_dir: PathBuf,
+    pub handles: RwLock<HashMap<String, Arc<ManagedTorrent>>>,
 }
 
-pub async fn start_stream(info_hash: &str, file_idx: Option<u32>) -> Option<String> {
-    let session = get_session().await;
-    let magnet_uri = format!("magnet:?xt=urn:btih:{}", info_hash);
+pub static TORRENT_MANAGER: OnceLock<Arc<TorrentManager>> = OnceLock::new();
 
-    println!("🧲 Connecting to swarm for: {}", magnet_uri);
+impl TorrentManager {
+    pub async fn new(cache_dir: PathBuf) -> anyhow::Result<Self> {
+        let session = Session::new_with_opts(
+            cache_dir.clone(),
+            SessionOptions {
+                // Force sequential piece picking for streaming
+                ..Default::default()
+            },
+        )
+        .await?;
 
-    let mut options = AddTorrentOptions::default();
-    options.overwrite = true;
-
-    if let Some(idx) = file_idx {
-        options.only_files = Some(vec![idx as usize]);
+        Ok(Self {
+            session: session,
+            cache_dir,
+            handles: RwLock::new(HashMap::new()),
+        })
     }
 
-    let add_result = match session
-        .add_torrent(AddTorrent::from_url(&magnet_uri), Some(options))
-        .await {
-        Ok(res) => res,
-        Err(e) => {
-            eprintln!("Failed to add torrent: {}", e);
-            return None;
+    pub async fn stream_torrent(&self, info_hash: &str, file_idx: usize) -> anyhow::Result<Arc<ManagedTorrent>> {
+        if let Some(handle) = self.handles.read().unwrap().get(info_hash) {
+            return Ok(handle.clone());
         }
-    };
 
-    println!("⏳ Torrent added to session, waiting for metadata...");
+        let magnet = format!("magnet:?xt=urn:btih:{}", info_hash);
 
-    let handle = match add_result.into_handle() {
-        Some(h) => h,
-        None => {
-            eprintln!("Failed to get torrent handle after adding torrent");
-            return None;
-        }
-    };
-    if let Err(e) = handle.wait_until_initialized().await {
-        eprintln!("Error waiting for torrent metadata: {}", e);
-        return None;
+        let response = self
+            .session
+            .add_torrent(
+                AddTorrent::from_url(magnet),
+                Some(AddTorrentOptions {
+                    paused: false,
+                    list_only: false,
+                    // Only download the specific file that's being played; this focuses
+                    // piece selection on the right file and avoids wasting bandwidth.
+                    only_files: Some(vec![file_idx]),
+                    overwrite: true,
+                    ..Default::default()
+                })
+            )
+            .await?;
+
+        let handle = response
+            .into_handle()
+            .ok_or_else(|| anyhow::anyhow!("Failed to get torrent handle"))?;
+
+        self.handles.write().unwrap().insert(info_hash.to_string(), handle.clone());
+
+        Ok(handle)
     }
+}
 
-    println!("✅ Metadata retrieved for info hash: {}", info_hash);
+pub fn largest_file_id(handle: &Arc<ManagedTorrent>) -> anyhow::Result<usize> {
+    handle.with_metadata(|meta| {
+        meta.file_infos
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, fi)| fi.len)
+            .map(|(i, _)| i)
+            .unwrap_or(0)
+    })
+}
 
-    let handles_map = TORRENT_HANDLES.get_or_init(|| RwLock::new(HashMap::new()));
-    handles_map.write().unwrap().insert(info_hash.to_string(), handle.clone());
-
-    let port = crate::stremio::server::SERVER_PORT.get().expect("Server port not initialized");
-
-    println!("🎬 Starting stream for info hash: {} on port {}", info_hash, port);
-
-    let idx = file_idx.unwrap_or(0);
-    let stream_url = format!("http://127.0.0.1:{}/stream/{}/{}", port, info_hash, idx);
-
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
-    Some(stream_url)
+pub fn file_name(handle: &Arc<ManagedTorrent>, file_id: usize) -> anyhow::Result<String> {
+    handle.with_metadata(|meta| {
+        match &meta.info.files {
+            Some(files) => files
+                .get(file_id)
+                .map(|f| {
+                    let segments: Vec<String> = f.path.iter()
+                        .map(|b| String::from_utf8_lossy(&b[..]).to_string())
+                        .collect();
+                    segments.join("/")
+                })
+                .unwrap_or_else(|| format!("file_{file_id}")),
+            None => meta
+                .name
+                .clone()
+                .unwrap_or_else(|| format!("file_{file_id}")),
+        }
+    })
 }

@@ -110,3 +110,13 @@ export async function playStream(stream: Stream) {
     throw err;
   }
 };
+
+export async function playInMpv(stream: Stream): Promise<void> {
+  await invoke("play_in_mpv", {
+    stream: {
+      url: stream.url,
+      infoHash: stream.infoHash,
+      fileIdx: stream.fileIdx,
+    },
+  });
+};

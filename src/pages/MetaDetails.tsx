@@ -1,16 +1,9 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { MetaItem, Stream, Video } from "../types";
 import { useEffect, useMemo, useState } from "react";
-import { fetchStreams, playStream } from "../api/stremio";
-import { Player } from "../components/Player";
+import { fetchStreams, playInMpv } from "../api/stremio";
+import { MpvPlayer } from "../components/MpvPlayer";
 
-/** Parse "2h 30min", "120 min", "1 hr 45 m" → seconds */
-function parseRuntime(runtime?: string | null): number {
-  if (!runtime) return 0;
-  const h = runtime.match(/(\d+)\s*h/i)?.[1];
-  const m = runtime.match(/(\d+)\s*m/i)?.[1];
-  return (h ? +h * 3600 : 0) + (m ? +m * 60 : 0);
-}
 
 export function MetaDetails() {
   const location = useLocation();
@@ -27,7 +20,7 @@ export function MetaDetails() {
 
   const [selectedAddon, setSelectedAddon] = useState<string>("All");
 
-  const [activeStreamUrl, setActiveStreamUrl] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isStartingStream, setIsStartingStream] = useState<boolean>(false);
   const [streamError, setStreamError] = useState<string | null>(null);
 
@@ -88,9 +81,8 @@ export function MetaDetails() {
   const handleStreamClick = async (stream: Stream) => {
     setIsStartingStream(true);
     try {
-      const url = await playStream(stream);
-      console.log("Got playable URL from Rust:", url);
-      setActiveStreamUrl(url);
+      await playInMpv(stream);
+      setIsPlaying(true);
     } catch (err: any) {
       setStreamError(err.message || "Failed to start stream.");
     } finally {
@@ -103,12 +95,10 @@ export function MetaDetails() {
   return (
     <div className="details-page">
 
-      {activeStreamUrl && (
-        <Player
-          streamUrl={activeStreamUrl}
+      {isPlaying && (
+        <MpvPlayer
           title={meta?.name || "Playing Video"}
-          onClose={() => setActiveStreamUrl(null)}
-          duration={parseRuntime(meta?.runtime)}
+          onClose={() => setIsPlaying(false)}
         />
       )}
 
