@@ -1,6 +1,9 @@
 use directories::ProjectDirs;
+use tauri::{AppHandle, Manager};
+use tauri::webview::Color;
 use stremio::models::PlayStreamRequest;
 
+pub mod mpv;
 pub mod stremio;
 
 #[tauri::command]
@@ -70,10 +73,52 @@ async fn play_stream_command(stream: PlayStreamRequest) -> Result<String, String
     Err("Invalid stream request: No URL or infoHash provided".to_string())
 }
 
+/// Like play_stream_command but returns a raw URL suitable for mpv
+/// (no FFmpeg/HLS transcoding — mpv handles all codecs natively).
+#[tauri::command]
+async fn play_stream_for_mpv(stream: PlayStreamRequest) -> Result<String, String> {
+    if let Some(url) = stream.url {
+        println!("Direct stream URL for mpv: {}", url);
+        return Ok(url);
+    }
+
+    if let Some(info_hash) = stream.info_hash {
+        println!("Requesting torrent stream for mpv, hash: {}", info_hash);
+
+        let raw_stream_url = match crate::stremio::torrent::start_stream(&info_hash, stream.file_idx).await {
+            Some(url) => url,
+            None => return Err("Failed to initialize torrent stream".to_string()),
+        };
+
+        // Return the raw stream URL directly — mpv plays it natively
+        return Ok(raw_stream_url);
+    }
+
+    Err("Invalid stream request: No URL or infoHash provided".to_string())
+}
+
+#[tauri::command]
+fn set_window_background(transparent: bool, app: AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or("main window not found")?;
+    let color = if transparent {
+        Color(0, 0, 0, 0)
+    } else {
+        Color(7, 5, 17, 255)
+    };
+    window.set_background_color(Some(color)).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .setup(|_app| {
+        .manage(mpv::commands::MpvHandle(std::sync::Mutex::new(None)))
+        .setup(|app| {
+            // Make window opaque by default; transparency is only enabled during mpv playback
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_background_color(Some(Color(7, 5, 17, 255)));
+            }
             tauri::async_runtime::spawn(async move {
                 crate::stremio::server::start_server().await;
             });
@@ -84,7 +129,20 @@ pub fn run() {
             get_installed_addons,
             fetch_catalog_from_addon,
             fetch_streams_from_addon,
-            play_stream_command
+            play_stream_command,
+            play_stream_for_mpv,
+            set_window_background,
+            // mpv commands
+            mpv::commands::mpv_play,
+            mpv::commands::mpv_stop,
+            mpv::commands::mpv_toggle_pause,
+            mpv::commands::mpv_set_pause,
+            mpv::commands::mpv_seek,
+            mpv::commands::mpv_set_volume,
+            mpv::commands::mpv_set_mute,
+            mpv::commands::mpv_get_state,
+            mpv::commands::mpv_get_tracks,
+            mpv::commands::mpv_set_track,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

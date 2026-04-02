@@ -110,3 +110,20 @@ export async function playStream(stream: Stream) {
     throw err;
   }
 };
+
+/** Get a raw URL for mpv (skips FFmpeg transcoding for torrents). */
+export async function playStreamForMpv(stream: Stream) {
+  try {
+    const url: string = await invoke("play_stream_for_mpv", {
+      stream: {
+        url: stream.url,
+        infoHash: stream.infoHash,
+        fileIdx: stream.fileIdx
+      }
+    });
+    return url;
+  } catch (err) {
+    console.error("Failed to get stream URL for mpv:", err);
+    throw err;
+  }
+};

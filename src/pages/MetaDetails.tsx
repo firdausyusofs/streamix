@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { MetaItem, Stream, Video } from "../types";
 import { useEffect, useMemo, useState } from "react";
-import { fetchStreams, playStream } from "../api/stremio";
+import { fetchStreams, playStreamForMpv } from "../api/stremio";
 import { Player } from "../components/Player";
 
 /** Parse "2h 30min", "120 min", "1 hr 45 m" → seconds */
@@ -27,8 +27,12 @@ export function MetaDetails() {
 
   const [selectedAddon, setSelectedAddon] = useState<string>("All");
 
-  const [activeStreamUrl, setActiveStreamUrl] = useState<string | null>(null);
-  const [isStartingStream, setIsStartingStream] = useState<boolean>(false);
+  const [playerSession, setPlayerSession] = useState<{
+    url: string | null;
+    logo?: string;
+    poster?: string;
+    title: string;
+  } | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -86,15 +90,18 @@ export function MetaDetails() {
   }, [streams, selectedAddon]);
 
   const handleStreamClick = async (stream: Stream) => {
-    setIsStartingStream(true);
+    setPlayerSession({
+      url: null,
+      logo: meta?.logo || undefined,
+      poster: meta?.poster || undefined,
+      title: meta?.name || "Playing Video",
+    });
     try {
-      const url = await playStream(stream);
-      console.log("Got playable URL from Rust:", url);
-      setActiveStreamUrl(url);
+      const url = await playStreamForMpv(stream);
+      setPlayerSession(prev => prev ? { ...prev, url } : null);
     } catch (err: any) {
+      setPlayerSession(null);
       setStreamError(err.message || "Failed to start stream.");
-    } finally {
-      setIsStartingStream(false);
     }
   };
 
@@ -103,21 +110,15 @@ export function MetaDetails() {
   return (
     <div className="details-page">
 
-      {activeStreamUrl && (
+      {playerSession && (
         <Player
-          streamUrl={activeStreamUrl}
-          title={meta?.name || "Playing Video"}
-          onClose={() => setActiveStreamUrl(null)}
+          streamUrl={playerSession.url}
+          logo={playerSession.logo}
+          poster={playerSession.poster}
+          title={playerSession.title}
+          onClose={() => setPlayerSession(null)}
           duration={parseRuntime(meta?.runtime)}
         />
-      )}
-
-      {isStartingStream && (
-        <div className="connecting-overlay">
-          <div className="spinner" style={{ width: 48, height: 48, borderWidth: 3 }} />
-          <h2>Connecting to Swarm…</h2>
-          <p>Downloading metadata and buffering video…</p>
-        </div>
       )}
 
       {streamError && (

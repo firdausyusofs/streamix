@@ -1,14 +1,33 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import Hls from "hls.js";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
-interface SubtitleTrack { id: number; name: string; lang?: string; }
-interface AudioTrack    { id: number; name: string; lang?: string; }
+interface MpvState {
+  playing: boolean;
+  time_pos: number;
+  duration: number;
+  volume: number;
+  muted: boolean;
+  idle: boolean;
+  paused_for_cache: boolean;
+  title: string;
+}
+
+interface Track {
+  type: string;
+  id: number;
+  title: string;
+  lang: string;
+  selected: boolean;
+}
 
 interface PlayerProps {
-  streamUrl: string;
+  streamUrl: string | null;
+  logo?: string;
+  poster?: string;
   title: string;
   onClose: () => void;
-  /** Known duration in seconds (e.g. parsed from meta.runtime). Takes priority over HLS detection. */
   duration?: number;
 }
 
@@ -21,26 +40,25 @@ function fmt(sec: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export function Player({ streamUrl, title, onClose, duration: propDuration }: PlayerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const videoRef     = useRef<HTMLVideoElement>(null);
-  const hlsRef       = useRef<Hls | null>(null);
-  const seekBarRef   = useRef<HTMLDivElement>(null);
-  const hideTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
+export function Player({ streamUrl, logo, poster, title, onClose, duration: propDuration }: PlayerProps) {
+  const containerRef   = useRef<HTMLDivElement>(null);
+  const seekBarRef     = useRef<HTMLDivElement>(null);
+  const hideTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstFrameRef  = useRef(false);
 
   const [playing,     setPlaying]     = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration,    setDuration]    = useState(propDuration ?? 0);
-  const [buffered,    setBuffered]    = useState(0);
-  const [volume,      setVolume]      = useState(1);
+  const [volume,      setVolume]      = useState(100);
   const [muted,       setMuted]       = useState(false);
+  const [buffering,   setBuffering]   = useState(true);
   const [visible,     setVisible]     = useState(true);
   const [fullscreen,  setFullscreen]  = useState(false);
   const [subMenu,     setSubMenu]     = useState(false);
   const [audioMenu,   setAudioMenu]   = useState(false);
-  const [subtitles,   setSubtitles]   = useState<SubtitleTrack[]>([]);
+  const [subtitles,   setSubtitles]   = useState<Track[]>([]);
   const [activeSub,   setActiveSub]   = useState(-1);
-  const [audios,      setAudios]      = useState<AudioTrack[]>([]);
+  const [audios,      setAudios]      = useState<Track[]>([]);
   const [activeAudio, setActiveAudio] = useState(0);
 
   const resetHide = useCallback(() => {
@@ -49,154 +67,176 @@ export function Player({ streamUrl, title, onClose, duration: propDuration }: Pl
     hideTimer.current = setTimeout(() => setVisible(false), 3000);
   }, []);
 
-  const toggleFullscreen = useCallback(() => {
-    if (!containerRef.current) return;
-    if (!document.fullscreenElement) containerRef.current.requestFullscreen();
-    else document.exitFullscreen();
+  const toggleFullscreen = useCallback(async () => {
+    const win = getCurrentWindow();
+    const isFs = await win.isFullscreen();
+    await win.setFullscreen(!isFs);
+    setFullscreen(!isFs);
   }, []);
 
+  // ── Add mpv-active synchronously before the first paint ─
+  useLayoutEffect(() => {
+    document.body.classList.add("mpv-active");
+    invoke("set_window_background", { transparent: true });
+    return () => {
+      document.body.classList.remove("mpv-active");
+      document.body.classList.remove("mpv-ready");
+      firstFrameRef.current = false;
+      invoke("set_window_background", { transparent: false });
+    };
+  }, []);
+
+  // ── Start mpv playback & subscribe to state events ───────
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    if (!streamUrl) return; // wait until URL is resolved
 
-    const onTime = () => {
-      setCurrentTime(video.currentTime);
-      if (video.buffered.length > 0)
-        setBuffered(video.buffered.end(video.buffered.length - 1));
-    };
-    const onPlay   = () => setPlaying(true);
-    const onPause  = () => setPlaying(false);
-    const onVol    = () => { setVolume(video.volume); setMuted(video.muted); };
-    const onDur    = () => {
-      if (isFinite(video.duration) && video.duration > 0 && !propDuration)
-        setDuration(video.duration);
-    };
+    let unlistenState: UnlistenFn | null = null;
+    let unlistenEnd: UnlistenFn | null = null;
+    let unlistenFirstFrame: UnlistenFn | null = null;
+    let mounted = true;
 
-    video.addEventListener("timeupdate",     onTime);
-    video.addEventListener("play",           onPlay);
-    video.addEventListener("pause",          onPause);
-    video.addEventListener("volumechange",   onVol);
-    video.addEventListener("durationchange", onDur);
+    (async () => {
+      // Register listeners before invoking mpv_play to avoid race conditions
 
-    let hls: Hls | null = null;
-
-    if (Hls.isSupported()) {
-      hls = new Hls({ maxBufferLength: 30, startLevel: -1, startPosition: 0 });
-      hlsRef.current = hls;
-      hls.loadSource(streamUrl);
-      hls.attachMedia(video);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(e => console.warn("Autoplay blocked:", e));
+      // Clear buffering overlay and make webview transparent once first GL frame is on screen
+      unlistenFirstFrame = await listen("mpv-first-frame", () => {
+        if (mounted) {
+          firstFrameRef.current = true;
+          setBuffering(false);
+          document.body.classList.add("mpv-ready");
+        }
       });
 
-      // On-the-fly HLS transcoding reports Infinity for duration.
-      // LEVEL_LOADED gives us totalduration by summing all manifest segments.
-      hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
-        const total = data.details.totalduration;
-        if (total > 0 && isFinite(total) && !propDuration)
-          setDuration(prev => (prev > 0 ? prev : total));
+      // Listen for mpv state updates
+      unlistenState = await listen<MpvState>("mpv-state", (event) => {
+        if (!mounted) return;
+        const s = event.payload;
+        setPlaying(s.playing);
+        setCurrentTime(s.time_pos);
+        if (s.duration > 0 && isFinite(s.duration)) {
+          setDuration(prev => propDuration && propDuration > 0 ? propDuration : (s.duration > 0 ? s.duration : prev));
+        }
+        setVolume(s.volume);
+        setMuted(s.muted);
+        setBuffering(s.paused_for_cache);
+        if (firstFrameRef.current) {
+          if (s.paused_for_cache) document.body.classList.remove("mpv-ready");
+          else document.body.classList.add("mpv-ready");
+        }
       });
 
-      hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (_, data) => {
-        setSubtitles(data.subtitleTracks.map((t, i) => ({
-          id: i, name: t.name || t.lang || `Subtitle ${i + 1}`, lang: t.lang,
-        })));
+      // Listen for end-of-file
+      unlistenEnd = await listen<string>("mpv-end-file", (event) => {
+        if (!mounted) return;
+        if (event.payload === "eof") {
+          onClose();
+        }
       });
-      hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_, data) => setActiveSub(data.id));
 
-      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_, data) => {
-        setAudios(data.audioTracks.map((t, i) => ({
-          id: i, name: t.name || t.lang || `Audio ${i + 1}`, lang: t.lang,
-        })));
-      });
-      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_, data) => setActiveAudio(data.id));
+      // Tell mpv to load this URL
+      await invoke("mpv_play", { url: streamUrl });
 
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal && data.type === Hls.ErrorTypes.MEDIA_ERROR)
-          hls!.recoverMediaError();
-      });
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = streamUrl;
-      video.addEventListener("loadedmetadata", () => video.play());
-    }
+      // Fetch available tracks after a short delay for mpv to load metadata
+      setTimeout(async () => {
+        if (!mounted) return;
+        try {
+          const tracksJson: string = await invoke("mpv_get_tracks");
+          const tracks: Track[] = JSON.parse(tracksJson);
+          setSubtitles(tracks.filter(t => t.type === "sub"));
+          setAudios(tracks.filter(t => t.type === "audio"));
+          const activeSt = tracks.find(t => t.type === "sub" && t.selected);
+          const activeAt = tracks.find(t => t.type === "audio" && t.selected);
+          if (activeSt) setActiveSub(activeSt.id);
+          if (activeAt) setActiveAudio(activeAt.id);
+        } catch { /* tracks not available yet */ }
+      }, 2000);
+    })();
 
+    // Keyboard shortcuts
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       switch (e.key) {
-        case "Escape":      onClose(); return;
-        case " ": case "k": e.preventDefault(); video.paused ? video.play() : video.pause(); break;
+        case "Escape":      getCurrentWindow().setFullscreen(false).catch(() => {}); onClose(); invoke("mpv_stop"); return;
+        case " ": case "k": e.preventDefault(); invoke("mpv_toggle_pause"); break;
         case "f": case "F": e.preventDefault(); toggleFullscreen(); break;
-        case "ArrowRight":  e.preventDefault(); video.currentTime = Math.min(video.currentTime + 10, video.duration || 0); break;
-        case "ArrowLeft":   e.preventDefault(); video.currentTime = Math.max(video.currentTime - 10, 0); break;
-        case "ArrowUp":     e.preventDefault(); video.volume = Math.min(video.volume + 0.1, 1); break;
-        case "ArrowDown":   e.preventDefault(); video.volume = Math.max(video.volume - 0.1, 0); break;
-        case "m": case "M": video.muted = !video.muted; break;
+        case "ArrowRight":  e.preventDefault(); invoke("mpv_seek", { seconds: Math.min(currentTime + 10, duration || Infinity) }); break;
+        case "ArrowLeft":   e.preventDefault(); invoke("mpv_seek", { seconds: Math.max(currentTime - 10, 0) }); break;
+        case "ArrowUp":     e.preventDefault(); invoke("mpv_set_volume", { volume: Math.min(volume + 5, 150) }); break;
+        case "ArrowDown":   e.preventDefault(); invoke("mpv_set_volume", { volume: Math.max(volume - 5, 0) }); break;
+        case "m": case "M": invoke("mpv_set_mute", { muted: !muted }); break;
       }
       resetHide();
     };
-    const onFsChange = () => setFullscreen(!!document.fullscreenElement);
+
+    // Sync fullscreen state when native window exits fullscreen (Esc / OS green button)
+    let unlistenResize: (() => void) | null = null;
+    getCurrentWindow().onResized(async () => {
+      const isFs = await getCurrentWindow().isFullscreen();
+      setFullscreen(isFs);
+    }).then(fn => { unlistenResize = fn; });
 
     window.addEventListener("keydown", onKey);
-    document.addEventListener("fullscreenchange", onFsChange);
     resetHide();
 
     return () => {
+      mounted = false;
       window.removeEventListener("keydown", onKey);
-      document.removeEventListener("fullscreenchange", onFsChange);
-      video.removeEventListener("timeupdate", onTime);
-      video.removeEventListener("play", onPlay);
-      video.removeEventListener("pause", onPause);
-      video.removeEventListener("volumechange", onVol);
-      video.removeEventListener("durationchange", onDur);
+      unlistenResize?.();
       if (hideTimer.current) clearTimeout(hideTimer.current);
-      hls?.destroy();
+      unlistenState?.();
+      unlistenEnd?.();
+      unlistenFirstFrame?.();
+      invoke("mpv_stop");
     };
-  }, [streamUrl, onClose, toggleFullscreen, resetHide, propDuration]);
+  }, [streamUrl]);
+
+  // ── Handlers ─────────────────────────────────────────────
 
   const togglePlay = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.paused ? v.play() : v.pause();
+    invoke("mpv_toggle_pause");
   }, []);
 
   const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const v   = videoRef.current;
     const bar = seekBarRef.current;
-    if (!v || !bar || duration <= 0) return;
+    if (!bar || duration <= 0) return;
     const rect = bar.getBoundingClientRect();
-    v.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * duration;
+    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * duration;
+    invoke("mpv_seek", { seconds: pos });
   }, [duration]);
 
   const handleVolume = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = videoRef.current;
-    if (!v) return;
     const val = Number(e.target.value);
-    v.volume = val;
-    v.muted  = val === 0;
-  }, []);
+    invoke("mpv_set_volume", { volume: val });
+    if (val === 0) invoke("mpv_set_mute", { muted: true });
+    else if (muted) invoke("mpv_set_mute", { muted: false });
+  }, [muted]);
 
   const toggleMute = useCallback(() => {
-    const v = videoRef.current;
-    if (v) v.muted = !v.muted;
-  }, []);
+    invoke("mpv_set_mute", { muted: !muted });
+  }, [muted]);
 
   const selectSub = useCallback((id: number) => {
-    if (hlsRef.current) hlsRef.current.subtitleTrack = id;
+    invoke("mpv_set_track", { trackType: "sub", id });
     setActiveSub(id);
     setSubMenu(false);
   }, []);
 
   const selectAudio = useCallback((id: number) => {
-    if (hlsRef.current) hlsRef.current.audioTrack = id;
+    invoke("mpv_set_track", { trackType: "audio", id });
     setActiveAudio(id);
     setAudioMenu(false);
   }, []);
 
+  const handleClose = useCallback(() => {
+    getCurrentWindow().setFullscreen(false).catch(() => {});
+    invoke("mpv_stop");
+    onClose();
+  }, [onClose]);
+
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
-  const bufferedPct = duration > 0 ? (buffered  / duration) * 100 : 0;
   const effectiveVol = muted ? 0 : volume;
+  const volNorm = effectiveVol / 100; // normalise 0-100 to 0-1 for display
 
   return (
     <div
@@ -206,11 +246,25 @@ export function Player({ streamUrl, title, onClose, duration: propDuration }: Pl
       onClick={() => { setSubMenu(false); setAudioMenu(false); }}
       style={{ cursor: visible ? "default" : "none" }}
     >
-      <video ref={videoRef} className="player-video" onClick={togglePlay} />
+      {/* Transparent click target — mpv renders natively behind this */}
+      <div className="player-video" onClick={togglePlay} />
+
+      {/* ── Buffering overlay ──────────────────────────── */}
+      {buffering && (
+        <div className="player-buffering">
+          {logo ? (
+            <img src={logo} alt={title} className="player-buffering-logo" />
+          ) : poster ? (
+            <img src={poster} alt={title} className="player-buffering-poster" />
+          ) : (
+            <span className="player-buffering-title">{title}</span>
+          )}
+        </div>
+      )}
 
       {/* ── Top bar ─────────────────────────────────── */}
       <div className={`player-top${visible ? " player-ui-on" : ""}`}>
-        <button className="player-back" onClick={onClose}>
+        <button className="player-back" onClick={handleClose}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6"/>
           </svg>
@@ -225,7 +279,6 @@ export function Player({ streamUrl, title, onClose, duration: propDuration }: Pl
         {/* Seek bar */}
         <div ref={seekBarRef} className="player-seek" onClick={handleSeek}>
           <div className="player-seek-track">
-            <div className="player-seek-buf"  style={{ width: `${bufferedPct}%` }} />
             <div className="player-seek-prog" style={{ width: `${progressPct}%` }}>
               <div className="player-seek-knob" />
             </div>
@@ -252,12 +305,12 @@ export function Player({ streamUrl, title, onClose, duration: propDuration }: Pl
 
             <div className="player-vol-wrap">
               <button className="player-icon-btn" onClick={toggleMute} title="Toggle mute (M)">
-                {effectiveVol === 0 ? (
+                {volNorm === 0 ? (
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="currentColor" stroke="none"/>
                     <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
                   </svg>
-                ) : effectiveVol < 0.5 ? (
+                ) : volNorm < 0.5 ? (
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="currentColor" stroke="none"/>
                     <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
@@ -272,9 +325,9 @@ export function Player({ streamUrl, title, onClose, duration: propDuration }: Pl
               </button>
               <input
                 className="player-vol-slider"
-                type="range" min={0} max={1} step={0.02}
+                type="range" min={0} max={100} step={1}
                 value={effectiveVol}
-                style={{ "--vol": `${effectiveVol * 100}%` } as React.CSSProperties}
+                style={{ "--vol": `${volNorm * 100}%` } as React.CSSProperties}
                 onChange={handleVolume}
                 onClick={e => e.stopPropagation()}
               />
@@ -306,7 +359,7 @@ export function Player({ streamUrl, title, onClose, duration: propDuration }: Pl
                     <button className={`player-popup-item${activeSub === -1 ? " active" : ""}`} onClick={() => selectSub(-1)}>Off</button>
                     {subtitles.map(t => (
                       <button key={t.id} className={`player-popup-item${activeSub === t.id ? " active" : ""}`} onClick={() => selectSub(t.id)}>
-                        {t.name}{t.lang ? ` (${t.lang})` : ""}
+                        {t.title || t.lang || `Subtitle ${t.id}`}
                       </button>
                     ))}
                   </div>
@@ -329,7 +382,7 @@ export function Player({ streamUrl, title, onClose, duration: propDuration }: Pl
                     <p className="player-popup-head">Audio Track</p>
                     {audios.map(t => (
                       <button key={t.id} className={`player-popup-item${activeAudio === t.id ? " active" : ""}`} onClick={() => selectAudio(t.id)}>
-                        {t.name}{t.lang ? ` (${t.lang})` : ""}
+                        {t.title || t.lang || `Audio ${t.id}`}
                       </button>
                     ))}
                   </div>

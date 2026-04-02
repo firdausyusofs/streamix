@@ -49,6 +49,82 @@ body::after {
   background: radial-gradient(circle, rgba(6, 182, 212, 0.2) 0%, transparent 70%);
 }
 
+/* When mpv player is active: black screen until the native window is attached */
+html:has(body.mpv-active) {
+  background: #000 !important;
+}
+body.mpv-active {
+  background-color: #000 !important;
+  background: #000 !important;
+}
+
+/* Once mpv has attached and is rendering, switch to transparent */
+html:has(body.mpv-active.mpv-ready) {
+  background: transparent !important;
+}
+body.mpv-active.mpv-ready {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+body.mpv-active::before,
+body.mpv-active::after {
+  display: none !important;
+}
+body.mpv-active .app-container {
+  visibility: hidden;
+}
+body.mpv-active .player-container {
+  visibility: visible;
+}
+
+/* ── Buffering overlay ──────────────────────────────────── */
+@keyframes breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.96); }
+  50%       { opacity: 1;    transform: scale(1.04); }
+}
+
+.player-buffering {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.player-buffering-logo {
+  max-width: 360px;
+  max-height: 160px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 32px rgba(0, 0, 0, 0.7));
+  animation: breathe 2.2s ease-in-out infinite;
+}
+
+.player-buffering-poster {
+  max-width: 180px;
+  max-height: 260px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 12px;
+  filter: drop-shadow(0 4px 32px rgba(0, 0, 0, 0.7));
+  animation: breathe 2.2s ease-in-out infinite;
+}
+
+.player-buffering-title {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: #fff;
+  text-align: center;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.9);
+  letter-spacing: -0.02em;
+  padding: 0 48px;
+  animation: breathe 2.2s ease-in-out infinite;
+}
+
 .app-container {
   position: relative;
   z-index: 1;
@@ -762,7 +838,7 @@ header h1 {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: #000;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -771,10 +847,13 @@ header h1 {
 }
 
 .player-video {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   outline: none;
   display: block;
+  background: transparent;
 }
 
 /* Fade in/out for top bar + bottom controls */
@@ -854,6 +933,7 @@ header h1 {
   display: flex;
   align-items: center;
   cursor: pointer;
+  background: rgba(255, 255, 255, 0.01); /* prevents click-through on transparent window */
 }
 
 .player-seek-track {
@@ -918,7 +998,7 @@ header h1 {
 
 /* ── Icon buttons ────────────────────────────── */
 .player-icon-btn {
-  background: none;
+  background: rgba(255, 255, 255, 0.01); /* non-zero alpha: prevents click-through on transparent window */
   border: none;
   color: rgba(255, 255, 255, 0.82);
   cursor: pointer;
