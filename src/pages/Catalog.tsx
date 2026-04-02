@@ -85,10 +85,12 @@ return (
           <div className="section-header">
             <h2>🔥 Top Movies</h2>
           </div>
-          <div className="meta-grid" ref={moviesGridRef}>
-            {catalogs.movies.slice(0, moviesPerRow).map((movie) => (
-              <MetaCard key={movie.id} meta={movie} onClick={handleMovieClick} />
-            ))}
+          <div className="meta-grid-scroll" ref={moviesGridRef}>
+            <div className="meta-grid">
+              {catalogs.movies.slice(0, moviesPerRow * 2).map((movie) => (
+                <MetaCard key={movie.id} meta={movie} onClick={handleMovieClick} />
+              ))}
+            </div>
           </div>
         </section>
       )}
@@ -99,10 +101,12 @@ return (
           <div className="section-header">
             <h2>📺 Top Series</h2>
           </div>
-          <div className="meta-grid" ref={seriesGridRef}>
-            {catalogs.series.slice(0, seriesPerRow).map((series) => (
-              <MetaCard key={series.id} meta={series} onClick={handleMovieClick} />
-            ))}
+          <div className="meta-grid-scroll" ref={seriesGridRef}>
+            <div className="meta-grid">
+              {catalogs.series.slice(0, seriesPerRow * 2).map((series) => (
+                <MetaCard key={series.id} meta={series} onClick={handleMovieClick} />
+              ))}
+            </div>
           </div>
         </section>
       )}
