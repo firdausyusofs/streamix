@@ -96,6 +96,7 @@ export function Player({ streamUrl, logo, poster, title, onClose, duration: prop
     let unlistenState: UnlistenFn | null = null;
     let unlistenEnd: UnlistenFn | null = null;
     let unlistenFirstFrame: UnlistenFn | null = null;
+    let unlistenFileLoaded: UnlistenFn | null = null;
     let mounted = true;
 
     (async () => {
@@ -121,7 +122,7 @@ export function Player({ streamUrl, logo, poster, title, onClose, duration: prop
         }
         setVolume(s.volume);
         setMuted(s.muted);
-        setBuffering(s.paused_for_cache);
+        setBuffering(firstFrameRef.current ? s.paused_for_cache : true);
         if (firstFrameRef.current) {
           if (s.paused_for_cache) document.body.classList.remove("mpv-ready");
           else document.body.classList.add("mpv-ready");
@@ -139,8 +140,8 @@ export function Player({ streamUrl, logo, poster, title, onClose, duration: prop
       // Tell mpv to load this URL
       await invoke("mpv_play", { url: streamUrl });
 
-      // Fetch available tracks after a short delay for mpv to load metadata
-      setTimeout(async () => {
+      // Fetch available tracks when mpv signals the file is fully loaded
+      const fetchTracks = async () => {
         if (!mounted) return;
         try {
           const tracksJson: string = await invoke("mpv_get_tracks");
@@ -152,7 +153,8 @@ export function Player({ streamUrl, logo, poster, title, onClose, duration: prop
           if (activeSt) setActiveSub(activeSt.id);
           if (activeAt) setActiveAudio(activeAt.id);
         } catch { /* tracks not available yet */ }
-      }, 2000);
+      };
+      unlistenFileLoaded = await listen("mpv-file-loaded", fetchTracks);
     })();
 
     // Keyboard shortcuts
@@ -192,6 +194,7 @@ export function Player({ streamUrl, logo, poster, title, onClose, duration: prop
       unlistenState?.();
       unlistenEnd?.();
       unlistenFirstFrame?.();
+      unlistenFileLoaded?.();
       invoke("mpv_stop");
     };
   }, [streamUrl]);
