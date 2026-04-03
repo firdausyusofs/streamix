@@ -3,6 +3,7 @@ import { MetaItem, Stream, Video } from "../types";
 import { useEffect, useMemo, useState } from "react";
 import { fetchStreams, playStreamForMpv } from "../api/stremio";
 import { Player } from "../components/Player";
+import { AlertTriangle, Film, Tv, X } from "lucide-react";
 
 /** Parse "2h 30min", "120 min", "1 hr 45 m" → seconds */
 function parseRuntime(runtime?: string | null): number {
@@ -10,6 +11,13 @@ function parseRuntime(runtime?: string | null): number {
   const h = runtime.match(/(\d+)\s*h/i)?.[1];
   const m = runtime.match(/(\d+)\s*m/i)?.[1];
   return (h ? +h * 3600 : 0) + (m ? +m * 60 : 0);
+}
+
+/** Episode thumbnail with onError fallback */
+function EpisodeThumbnail({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <div className="episode-thumb-placeholder"><Tv size={24} /></div>;
+  return <img src={src} alt={alt} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={() => setFailed(true)} />;
 }
 
 export function MetaDetails() {
@@ -40,6 +48,9 @@ export function MetaDetails() {
     const t = setTimeout(() => setStreamError(null), 5000);
     return () => clearTimeout(t);
   }, [streamError]);
+
+  const [posterFailed, setPosterFailed] = useState(false);
+  const [logoFailed,   setLogoFailed]   = useState(false);
 
   const availableSeasons = useMemo(() => {
     if (meta.type !== "series" || !meta.videos) return [];
@@ -123,9 +134,9 @@ export function MetaDetails() {
 
       {streamError && (
         <div className="stream-error-toast">
-          <span>⚠</span>
+          <AlertTriangle size={16} />
           <span>{streamError}</span>
-          <button className="toast-close" onClick={() => setStreamError(null)}>✕</button>
+          <button className="toast-close" onClick={() => setStreamError(null)}><X size={14} /></button>
         </div>
       )}
 
@@ -143,10 +154,21 @@ export function MetaDetails() {
         </button>
 
         <div className="details-header-grid">
-          <img src={meta.poster} alt={meta.name} className="details-poster" />
+          {meta.poster && !posterFailed ? (
+            <img
+              src={meta.poster}
+              alt={meta.name}
+              className="details-poster"
+              onError={() => setPosterFailed(true)}
+            />
+          ) : (
+            <div className="details-poster details-poster-placeholder">
+              <Film size={40} />
+            </div>
+          )}
           <div className="details-info">
-            {meta.logo ? (
-              <img src={meta.logo} alt={meta.name} className="meta-logo" />
+            {meta.logo && !logoFailed ? (
+              <img src={meta.logo} alt={meta.name} className="meta-logo" onError={() => setLogoFailed(true)} />
             ) : (
               <h1 className="meta-title-text">{meta.name}</h1>
             )}
@@ -208,9 +230,9 @@ export function MetaDetails() {
                   {/* Episode Thumbnail */}
                   <div style={{ aspectRatio: "16/9", background: "#0f172a", borderRadius: "6px", marginBottom: "12px", overflow: "hidden" }}>
                     {ep.thumbnail ? (
-                      <img src={ep.thumbnail} alt={ep.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      <EpisodeThumbnail src={ep.thumbnail} alt={ep.title || `Episode ${ep.episode}`} />
                     ) : (
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#64748b" }}>No Image</div>
+                      <div className="episode-thumb-placeholder"><Tv size={24} /></div>
                     )}
                   </div>
                   <div className="stream-card-header">
@@ -252,7 +274,7 @@ export function MetaDetails() {
 
             {!loading && error && (
               <div className="error-banner">
-                <span className="error-banner-icon">⚠</span>
+                <AlertTriangle size={16} className="error-banner-icon" />
                 <span>{error}</span>
               </div>
             )}

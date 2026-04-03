@@ -61,6 +61,9 @@ export function Player({ streamUrl, logo, poster, title, onClose, duration: prop
   const [audios,      setAudios]      = useState<Track[]>([]);
   const [activeAudio, setActiveAudio] = useState(0);
 
+  const [logoFailed,   setLogoFailed]   = useState(false);
+  const [posterFailed, setPosterFailed] = useState(false);
+
   const resetHide = useCallback(() => {
     setVisible(true);
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -252,10 +255,10 @@ export function Player({ streamUrl, logo, poster, title, onClose, duration: prop
       {/* ── Buffering overlay ──────────────────────────── */}
       {buffering && (
         <div className="player-buffering">
-          {logo ? (
-            <img src={logo} alt={title} className="player-buffering-logo" />
-          ) : poster ? (
-            <img src={poster} alt={title} className="player-buffering-poster" />
+          {logo && !logoFailed ? (
+            <img src={logo} alt={title} className="player-buffering-logo" onError={() => setLogoFailed(true)} />
+          ) : poster && !posterFailed ? (
+            <img src={poster} alt={title} className="player-buffering-poster" onError={() => setPosterFailed(true)} />
           ) : (
             <span className="player-buffering-title">{title}</span>
           )}

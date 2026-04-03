@@ -3,6 +3,7 @@ import { MetaItem } from "../types";
 import { MetaCard } from "../components/MetaCard";
 import { fetchHomeCatalogs, HomeCatalog } from "../api/stremio";
 import { useNavigate } from "react-router";
+import { AlertTriangle, Clapperboard, ChevronRight, Flame, Tv } from "lucide-react";
 
 const MIN_CARD_WIDTH = 220;
 const GRID_GAP = 24;
@@ -63,7 +64,7 @@ export function Catalog() {
   if (error) return (
     <div className="status-screen">
       <div className="status-card error-card">
-        <span className="status-icon">⚠</span>
+        <AlertTriangle className="status-icon" size={28} />
         <h3>Couldn't load catalog</h3>
         <p>{error}</p>
         <button className="btn-retry" onClick={loadCatalogs}>Try Again</button>
@@ -75,7 +76,7 @@ return (
     <div className="page-content">
       <header className="app-header">
         <div className="brand-container">
-          <h1>🍿 Stream<span className="brand-accent">ix</span></h1>
+          <h1><Clapperboard size={28} className="brand-icon" /> Stream<span className="brand-accent">ix</span></h1>
         </div>
       </header>
 
@@ -83,7 +84,10 @@ return (
       {catalogs.movies.length > 0 && (
         <section className="catalog-section">
           <div className="section-header">
-            <h2>🔥 Top Movies</h2>
+            <h2><Flame size={20} className="section-icon" /> Top Movies</h2>
+            <button className="see-all-btn" onClick={() => navigate("/explore?type=movie")}>
+              See All <ChevronRight size={14} />
+            </button>
           </div>
           <div className="meta-grid" ref={moviesGridRef}>
             {catalogs.movies.slice(0, moviesPerRow).map((movie) => (
@@ -97,7 +101,10 @@ return (
       {catalogs.series.length > 0 && (
         <section className="catalog-section" style={{ marginTop: "40px" }}>
           <div className="section-header">
-            <h2>📺 Top Series</h2>
+            <h2><Tv size={20} className="section-icon" /> Top Series</h2>
+            <button className="see-all-btn" onClick={() => navigate("/explore?type=series")}>
+              See All <ChevronRight size={14} />
+            </button>
           </div>
           <div className="meta-grid" ref={seriesGridRef}>
             {catalogs.series.slice(0, seriesPerRow).map((series) => (

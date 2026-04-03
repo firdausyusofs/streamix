@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Film } from "lucide-react";
 import { MetaItem } from "../types";
 
 interface MetaCardProps {
@@ -6,20 +8,28 @@ interface MetaCardProps {
 };
 
 export function MetaCard({ meta, onClick }: MetaCardProps) {
-return (
+  const [imgFailed, setImgFailed] = useState(false);
+  const showPlaceholder = !meta.poster || imgFailed;
+
+  return (
     <div className="meta-card" onClick={() => onClick(meta)}>
       <div className="poster-wrapper">
-        {meta.poster ? (
-            <img src={meta.poster} alt={meta.name} loading="lazy" />
-        ) : (
-            <div className="poster-placeholder">{meta.name}</div>
+        {!showPlaceholder && (
+          <img
+            src={meta.poster!}
+            alt={meta.name}
+            loading="lazy"
+            onError={() => setImgFailed(true)}
+          />
+        )}
+        {showPlaceholder && (
+          <div className="poster-placeholder">
+            <Film size={48} className="poster-placeholder-icon" />
+          </div>
         )}
       </div>
       <div className="meta-info">
         <h3 title={meta.name}>{meta.name}</h3>
-        {/* <span>
-          {meta.releaseInfo} {meta.genres?.length ? `• ${meta.genres.slice(0, 2).join(", ")}` : ""}
-        </span> */}
       </div>
     </div>
   );
