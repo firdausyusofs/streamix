@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MetaItem } from "../types";
 import { MetaCard } from "../components/MetaCard";
+import { AppHeader } from "../components/AppHeader";
 import { fetchHomeCatalogs } from "../api/stremio";
 import { useNavigate, useSearchParams } from "react-router";
-import { AlertTriangle, Compass } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 const MIN_CARD_WIDTH = 220;
 const GRID_GAP = 24;
@@ -37,8 +38,10 @@ export function Explore() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [gridRef] = useCardsPerRow();
+  const [query, setQuery] = useState("");
 
-  const items = type === "movie" ? catalogs.movies : catalogs.series;
+  const items = (type === "movie" ? catalogs.movies : catalogs.series)
+    .filter(item => item.name.toLowerCase().includes(query.toLowerCase()));
 
   const loadCatalogs = useCallback(() => {
     setLoading(true);
@@ -78,19 +81,22 @@ export function Explore() {
 
   return (
     <div className="page-content">
-      <header className="app-header">
-        <div className="explore-header-inner">
-          <h2 className="explore-title"><Compass size={22} className="brand-icon" /> Explore</h2>
-          <select
-            className="type-dropdown"
-            value={type}
-            onChange={e => setSearchParams({ type: e.target.value })}
-          >
-            <option value="movie">Movies</option>
-            <option value="series">Series</option>
-          </select>
-        </div>
-      </header>
+      <AppHeader
+        query={query}
+        onQueryChange={q => { setQuery(q); }}
+        searchPlaceholder="Search movies & series…"
+      />
+
+      <div className="explore-toolbar">
+        <select
+          className="type-dropdown"
+          value={type}
+          onChange={e => setSearchParams({ type: e.target.value })}
+        >
+          <option value="movie">Movies</option>
+          <option value="series">Series</option>
+        </select>
+      </div>
 
       <div className="meta-grid explore-grid" ref={gridRef}>
         {items.map((item) => (

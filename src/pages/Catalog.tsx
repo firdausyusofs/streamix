@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MetaItem } from "../types";
 import { MetaCard } from "../components/MetaCard";
+import { AppHeader } from "../components/AppHeader";
 import { fetchHomeCatalogs, HomeCatalog } from "../api/stremio";
 import { useNavigate } from "react-router";
-import { AlertTriangle, Clapperboard, ChevronRight, Flame, Tv } from "lucide-react";
+import { AlertTriangle, ChevronRight, Flame, Tv } from "lucide-react";
 
 const MIN_CARD_WIDTH = 220;
 const GRID_GAP = 24;
@@ -35,6 +36,7 @@ export function Catalog() {
   const [error, setError] = useState<string | null>(null);
   const [moviesGridRef, moviesPerRow] = useCardsPerRow();
   const [seriesGridRef, seriesPerRow] = useCardsPerRow();
+  const [query, setQuery] = useState("");
 
   const loadCatalogs = useCallback(() => {
     setLoading(true);
@@ -74,11 +76,11 @@ export function Catalog() {
 
 return (
     <div className="page-content">
-      <header className="app-header">
-        <div className="brand-container">
-          <h1><Clapperboard size={28} className="brand-icon" /> Stream<span className="brand-accent">ix</span></h1>
-        </div>
-      </header>
+      <AppHeader
+        query={query}
+        onQueryChange={setQuery}
+        searchPlaceholder="Search movies & series…"
+      />
 
       {/* TOP MOVIES SECTION */}
       {catalogs.movies.length > 0 && (
@@ -90,9 +92,12 @@ return (
             </button>
           </div>
           <div className="meta-grid" ref={moviesGridRef}>
-            {catalogs.movies.slice(0, moviesPerRow).map((movie) => (
-              <MetaCard key={movie.id} meta={movie} onClick={handleMovieClick} />
-            ))}
+            {catalogs.movies
+              .filter(m => m.name.toLowerCase().includes(query.toLowerCase()))
+              .slice(0, moviesPerRow)
+              .map((movie) => (
+                <MetaCard key={movie.id} meta={movie} onClick={handleMovieClick} />
+              ))}
           </div>
         </section>
       )}
@@ -107,9 +112,12 @@ return (
             </button>
           </div>
           <div className="meta-grid" ref={seriesGridRef}>
-            {catalogs.series.slice(0, seriesPerRow).map((series) => (
-              <MetaCard key={series.id} meta={series} onClick={handleMovieClick} />
-            ))}
+            {catalogs.series
+              .filter(s => s.name.toLowerCase().includes(query.toLowerCase()))
+              .slice(0, seriesPerRow)
+              .map((series) => (
+                <MetaCard key={series.id} meta={series} onClick={handleMovieClick} />
+              ))}
           </div>
         </section>
       )}

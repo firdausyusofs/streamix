@@ -1,13 +1,10 @@
 import { Puzzle } from "lucide-react";
+import { AppHeader } from "../components/AppHeader";
 
 export function Addons() {
   return (
     <div className="page-content">
-      <header className="app-header">
-        <div className="brand-container">
-          <h2 className="page-heading"><Puzzle size={22} className="brand-icon" /> Addons</h2>
-        </div>
-      </header>
+      <AppHeader />
       <div className="addons-placeholder">
         <div className="addons-placeholder-icon">
           <Puzzle size={56} />

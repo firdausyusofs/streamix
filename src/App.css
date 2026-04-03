@@ -140,7 +140,7 @@ header {
   left: 0;
   width: 100%;
   z-index: 100;
-  padding: 20px 40px;
+  padding: 14px 32px;
   background: rgba(7, 5, 17, 0.65);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -148,18 +148,52 @@ header {
   box-sizing: border-box;
 }
 
-header h1 {
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 800;
-  letter-spacing: -0.5px;
+.app-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 20px;
+  max-width: 100%;
+}
+
+/* Left — brand */
+.header-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
+  flex-shrink: 0;
+}
+
+.header-brand-name {
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
   background: linear-gradient(135deg, #ffffff 0%, #e0d7ff 40%, #a78bfa 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Right — profile */
+.header-profile-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--surface-border);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.header-profile-btn:hover {
+  background: rgba(139, 92, 246, 0.18);
+  border-color: rgba(139, 92, 246, 0.4);
+  color: var(--text-primary);
 }
 
 .brand-accent {
@@ -1231,24 +1265,6 @@ main.with-tab-bar {
 }
 
 /* ── Explore Page ─────────────────────────────── */
-.explore-header-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-}
-
-.explore-title {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text-primary);
-}
-
 .type-dropdown {
   appearance: none;
   -webkit-appearance: none;
@@ -1366,4 +1382,71 @@ main.with-tab-bar {
   justify-content: center;
   background: linear-gradient(160deg, rgba(109, 40, 217, 0.12) 0%, rgba(7, 5, 17, 0.8) 100%);
   color: rgba(167, 139, 250, 0.45);
+}
+
+/* ── Header Search ───────────────────────────── */
+.header-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 400px;
+  justify-self: center;
+}
+
+.header-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-secondary);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.header-search-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--surface-border);
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  padding: 8px 36px 8px 34px;
+  outline: none;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+.header-search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.header-search-input:focus {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12);
+}
+
+.header-search-clear {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 50%;
+  transition: color 0.2s ease;
+}
+
+.header-search-clear:hover {
+  color: var(--text-primary);
+}
+
+/* ── Explore toolbar (below header) ─────────── */
+.explore-toolbar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
 }
