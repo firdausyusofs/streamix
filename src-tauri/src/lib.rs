@@ -143,6 +143,7 @@ pub fn run() {
             mpv::commands::mpv_get_state,
             mpv::commands::mpv_get_tracks,
             mpv::commands::mpv_set_track,
+            mpv::commands::mpv_update_context,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

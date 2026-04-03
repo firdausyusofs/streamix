@@ -440,6 +440,21 @@ impl MpvPlayer {
 
     // ── Playback commands ──────────────────────────────────
 
+    /// Notify the NSOpenGLContext that the view has been resized (e.g. on entering
+    /// macOS fullscreen via the green button). Must be dispatched to the main thread
+    /// because NSOpenGLContext.update() is an AppKit call.
+    pub fn update_gl_context(&self) {
+        let gl_ctx_addr = Retained::as_ptr(&self._gl_ctx.0) as usize;
+        let _ = self.app.run_on_main_thread(move || {
+            let gl_ctx: &NSOpenGLContext =
+                unsafe { &*(gl_ctx_addr as *const NSOpenGLContext) };
+            // SAFETY: we are on the main thread (guaranteed by run_on_main_thread).
+            let mtm = unsafe { objc2::MainThreadMarker::new_unchecked() };
+            #[allow(deprecated)]
+            gl_ctx.update(mtm);
+        });
+    }
+
     pub fn load_file(&self, url: &str) -> Result<(), String> {
         unsafe { ffi::command(self.ctx.ptr, &["loadfile", url, "replace"]) }
     }

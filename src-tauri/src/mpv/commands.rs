@@ -92,3 +92,12 @@ pub fn mpv_set_track(track_type: String, id: i64, handle: State<'_, MpvHandle>) 
     let lock = handle.0.lock().map_err(|e| e.to_string())?;
     lock.as_ref().ok_or("mpv not initialised")?.set_track(&track_type, id)
 }
+
+#[tauri::command]
+pub fn mpv_update_context(handle: State<'_, MpvHandle>) -> Result<(), String> {
+    let lock = handle.0.lock().map_err(|e| e.to_string())?;
+    if let Some(player) = lock.as_ref() {
+        player.update_gl_context();
+    }
+    Ok(())
+}

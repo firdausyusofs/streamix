@@ -177,6 +177,8 @@ export function Player({ streamUrl, logo, poster, title, onClose, duration: prop
     getCurrentWindow().onResized(async () => {
       const isFs = await getCurrentWindow().isFullscreen();
       setFullscreen(isFs);
+      // Notify the GL context of the new dimensions so mpv renders at full size
+      invoke("mpv_update_context").catch(() => {});
     }).then(fn => { unlistenResize = fn; });
 
     window.addEventListener("keydown", onKey);

@@ -52,10 +52,12 @@ body::after {
 /* When mpv player is active: black screen until the native window is attached */
 html:has(body.mpv-active) {
   background: #000 !important;
+  overflow: hidden !important;
 }
 body.mpv-active {
   background-color: #000 !important;
   background: #000 !important;
+  overflow: hidden !important;
 }
 
 /* Once mpv has attached and is rendering, switch to transparent */
