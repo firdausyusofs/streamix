@@ -32,8 +32,8 @@ pub fn mpv_play(
     app: AppHandle,
 ) -> Result<(), String> {
     ensure_player(&handle, &app)?;
-    let lock = handle.0.lock().map_err(|e| e.to_string())?;
-    lock.as_ref().unwrap().load_file(&url)
+    let mut lock = handle.0.lock().map_err(|e| e.to_string())?;
+    lock.as_mut().unwrap().load_file(&url)
 }
 
 #[tauri::command]

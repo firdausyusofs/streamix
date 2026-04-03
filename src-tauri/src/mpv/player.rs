@@ -1,4 +1,5 @@
-use std::ffi::c_void;
+use std::ffi::{c_void, CString};
+use std::os::raw::{c_char, c_int};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
@@ -9,6 +10,59 @@ use objc2_app_kit::{NSOpenGLContext, NSView};
 use tauri::{AppHandle, Emitter};
 
 use super::ffi;
+
+// ── IOKit / CoreFoundation bindings for display-sleep prevention ──────────────
+
+type CFAllocatorRef = *const c_void;
+type CFStringRef    = *const c_void;
+type IOReturn       = c_int;
+type IOPMAssertionID = u32;
+
+const KCF_STRING_ENCODING_UTF8:   u32 = 0x0800_0100;
+const KIOPM_ASSERTION_LEVEL_ON:    u32 = 255;
+const KIOPM_ASSERTION_TYPE: &str = "PreventUserIdleDisplaySleep";
+
+#[link(name = "IOKit",         kind = "framework")]
+#[link(name = "CoreFoundation", kind = "framework")]
+extern "C" {
+    fn CFStringCreateWithCString(
+        alloc:    CFAllocatorRef,
+        c_str:    *const c_char,
+        encoding: u32,
+    ) -> CFStringRef;
+    fn CFRelease(cf: CFStringRef);
+    fn IOPMAssertionCreateWithName(
+        assertion_type:  CFStringRef,
+        assertion_level: u32,
+        assertion_name:  CFStringRef,
+        assertion_id:    *mut IOPMAssertionID,
+    ) -> IOReturn;
+    fn IOPMAssertionRelease(assertion_id: IOPMAssertionID) -> IOReturn;
+}
+
+fn acquire_display_assertion() -> Option<IOPMAssertionID> {
+    let type_str  = CString::new(KIOPM_ASSERTION_TYPE).ok()?;
+    let name_str  = CString::new("Streamix is playing media").ok()?;
+    let mut id: IOPMAssertionID = 0;
+    unsafe {
+        let cf_type = CFStringCreateWithCString(
+            std::ptr::null(), type_str.as_ptr(), KCF_STRING_ENCODING_UTF8,
+        );
+        let cf_name = CFStringCreateWithCString(
+            std::ptr::null(), name_str.as_ptr(), KCF_STRING_ENCODING_UTF8,
+        );
+        let ret = IOPMAssertionCreateWithName(
+            cf_type, KIOPM_ASSERTION_LEVEL_ON, cf_name, &mut id,
+        );
+        CFRelease(cf_type);
+        CFRelease(cf_name);
+        if ret == 0 { Some(id) } else { None }
+    }
+}
+
+fn release_display_assertion(id: IOPMAssertionID) {
+    unsafe { IOPMAssertionRelease(id); }
+}
 
 /// Serialisable snapshot of mpv state, emitted to the frontend.
 #[derive(Clone, serde::Serialize)]
@@ -88,6 +142,7 @@ pub struct MpvPlayer {
     event_thread: Option<std::thread::JoinHandle<()>>,
     render_thread: Option<std::thread::JoinHandle<()>>,
     app: AppHandle,
+    display_assertion_id: Option<IOPMAssertionID>,
 }
 
 // SAFETY: MpvPlayer is guarded by a Mutex in MpvHandle.
@@ -163,6 +218,7 @@ impl MpvPlayer {
             event_thread: None,
             render_thread: None,
             app,
+            display_assertion_id: None,
         })
     }
 
@@ -455,7 +511,10 @@ impl MpvPlayer {
         });
     }
 
-    pub fn load_file(&self, url: &str) -> Result<(), String> {
+    pub fn load_file(&mut self, url: &str) -> Result<(), String> {
+        if self.display_assertion_id.is_none() {
+            self.display_assertion_id = acquire_display_assertion();
+        }
         unsafe { ffi::command(self.ctx.ptr, &["loadfile", url, "replace"]) }
     }
 
@@ -593,6 +652,10 @@ impl Drop for MpvPlayer {
         // Now safe to destroy mpv
         if !self.ctx.ptr.is_null() {
             unsafe { ffi::mpv_terminate_destroy(self.ctx.ptr) };
+        }
+        // Release display-sleep assertion so the screen can sleep again
+        if let Some(id) = self.display_assertion_id.take() {
+            release_display_assertion(id);
         }
         // Remove the NSView from the window (AppKit requires main thread).
         // The window's contentView retains the subview, so the pointer stays
