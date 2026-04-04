@@ -27,8 +27,8 @@ interface PlayerProps {
   logo?: string;
   poster?: string;
   title: string;
+  infoHash?: string;
   onClose: () => void;
-  duration?: number;
 }
 
 function fmt(sec: number): string {
@@ -40,7 +40,7 @@ function fmt(sec: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export function Player({ streamUrl, logo, poster, title, onClose, duration: propDuration }: PlayerProps) {
+export function Player({ streamUrl, logo, poster, title, infoHash, onClose }: PlayerProps) {
   const containerRef   = useRef<HTMLDivElement>(null);
   const seekBarRef     = useRef<HTMLDivElement>(null);
   const hideTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -48,9 +48,14 @@ export function Player({ streamUrl, logo, poster, title, onClose, duration: prop
 
   const [playing,     setPlaying]     = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration,    setDuration]    = useState(propDuration ?? 0);
+  const [duration,    setDuration]    = useState(0);
   const [volume,      setVolume]      = useState(100);
   const [muted,       setMuted]       = useState(false);
+
+  const currentTimeRef = useRef(0);
+  const durationRef    = useRef(0);
+  const volumeRef      = useRef(100);
+  const mutedRef       = useRef(false);
   const [buffering,   setBuffering]   = useState(true);
   const [visible,     setVisible]     = useState(true);
   const [fullscreen,  setFullscreen]  = useState(false);
@@ -116,11 +121,15 @@ export function Player({ streamUrl, logo, poster, title, onClose, duration: prop
         if (!mounted) return;
         const s = event.payload;
         setPlaying(s.playing);
+        currentTimeRef.current = s.time_pos;
         setCurrentTime(s.time_pos);
         if (s.duration > 0 && isFinite(s.duration)) {
-          setDuration(prev => propDuration && propDuration > 0 ? propDuration : (s.duration > 0 ? s.duration : prev));
+          durationRef.current = s.duration;
+          setDuration(s.duration);
         }
+        volumeRef.current = s.volume;
         setVolume(s.volume);
+        mutedRef.current = s.muted;
         setMuted(s.muted);
         setBuffering(firstFrameRef.current ? s.paused_for_cache : true);
         if (firstFrameRef.current) {
@@ -133,6 +142,7 @@ export function Player({ streamUrl, logo, poster, title, onClose, duration: prop
       unlistenEnd = await listen<string>("mpv-end-file", (event) => {
         if (!mounted) return;
         if (event.payload === "eof") {
+          if (infoHash) invoke("stop_stream_command", { infoHash });
           onClose();
         }
       });
@@ -162,14 +172,14 @@ export function Player({ streamUrl, logo, poster, title, onClose, duration: prop
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       switch (e.key) {
-        case "Escape":      getCurrentWindow().setFullscreen(false).catch(() => {}); onClose(); invoke("mpv_stop"); return;
+        case "Escape":      getCurrentWindow().setFullscreen(false).catch(() => {}); return;
         case " ": case "k": e.preventDefault(); invoke("mpv_toggle_pause"); break;
         case "f": case "F": e.preventDefault(); toggleFullscreen(); break;
-        case "ArrowRight":  e.preventDefault(); invoke("mpv_seek", { seconds: Math.min(currentTime + 10, duration || Infinity) }); break;
-        case "ArrowLeft":   e.preventDefault(); invoke("mpv_seek", { seconds: Math.max(currentTime - 10, 0) }); break;
-        case "ArrowUp":     e.preventDefault(); invoke("mpv_set_volume", { volume: Math.min(volume + 5, 150) }); break;
-        case "ArrowDown":   e.preventDefault(); invoke("mpv_set_volume", { volume: Math.max(volume - 5, 0) }); break;
-        case "m": case "M": invoke("mpv_set_mute", { muted: !muted }); break;
+        case "ArrowRight":  e.preventDefault(); invoke("mpv_seek", { seconds: Math.min(currentTimeRef.current + 10, durationRef.current || Infinity) }); break;
+        case "ArrowLeft":   e.preventDefault(); invoke("mpv_seek", { seconds: Math.max(currentTimeRef.current - 10, 0) }); break;
+        case "ArrowUp":     e.preventDefault(); invoke("mpv_set_volume", { volume: Math.min(volumeRef.current + 5, 150) }); break;
+        case "ArrowDown":   e.preventDefault(); invoke("mpv_set_volume", { volume: Math.max(volumeRef.current - 5, 0) }); break;
+        case "m": case "M": invoke("mpv_set_mute", { muted: !mutedRef.current }); break;
       }
       resetHide();
     };
@@ -239,8 +249,9 @@ export function Player({ streamUrl, logo, poster, title, onClose, duration: prop
   const handleClose = useCallback(() => {
     getCurrentWindow().setFullscreen(false).catch(() => {});
     invoke("mpv_stop");
+    if (infoHash) invoke("stop_stream_command", { infoHash });
     onClose();
-  }, [onClose]);
+  }, [onClose, infoHash]);
 
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
   const effectiveVol = muted ? 0 : volume;

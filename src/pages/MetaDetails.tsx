@@ -5,13 +5,6 @@ import { fetchStreams, playStreamForMpv } from "../api/stremio";
 import { Player } from "../components/Player";
 import { AlertTriangle, Film, Tv, X } from "lucide-react";
 
-/** Parse "2h 30min", "120 min", "1 hr 45 m" → seconds */
-function parseRuntime(runtime?: string | null): number {
-  if (!runtime) return 0;
-  const h = runtime.match(/(\d+)\s*h/i)?.[1];
-  const m = runtime.match(/(\d+)\s*m/i)?.[1];
-  return (h ? +h * 3600 : 0) + (m ? +m * 60 : 0);
-}
 
 /** Episode thumbnail with onError fallback */
 function EpisodeThumbnail({ src, alt }: { src: string; alt: string }) {
@@ -40,6 +33,7 @@ export function MetaDetails() {
     logo?: string;
     poster?: string;
     title: string;
+    infoHash?: string;
   } | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
 
@@ -106,6 +100,7 @@ export function MetaDetails() {
       logo: meta?.logo || undefined,
       poster: meta?.poster || undefined,
       title: meta?.name || "Playing Video",
+      infoHash: stream.infoHash,
     });
     try {
       const url = await playStreamForMpv(stream);
@@ -127,8 +122,8 @@ export function MetaDetails() {
           logo={playerSession.logo}
           poster={playerSession.poster}
           title={playerSession.title}
+          infoHash={playerSession.infoHash}
           onClose={() => setPlayerSession(null)}
-          duration={parseRuntime(meta?.runtime)}
         />
       )}
 

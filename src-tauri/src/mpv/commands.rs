@@ -26,11 +26,7 @@ fn ensure_player(handle: &MpvHandle, app: &AppHandle) -> Result<(), String> {
 // ── Tauri commands ─────────────────────────────────────────────
 
 #[tauri::command]
-pub fn mpv_play(
-    url: String,
-    handle: State<'_, MpvHandle>,
-    app: AppHandle,
-) -> Result<(), String> {
+pub fn mpv_play(url: String, handle: State<'_, MpvHandle>, app: AppHandle) -> Result<(), String> {
     ensure_player(&handle, &app)?;
     let mut lock = handle.0.lock().map_err(|e| e.to_string())?;
     lock.as_mut().unwrap().load_file(&url)
@@ -54,19 +50,25 @@ pub fn mpv_toggle_pause(handle: State<'_, MpvHandle>) -> Result<(), String> {
 #[tauri::command]
 pub fn mpv_set_pause(paused: bool, handle: State<'_, MpvHandle>) -> Result<(), String> {
     let lock = handle.0.lock().map_err(|e| e.to_string())?;
-    lock.as_ref().ok_or("mpv not initialised")?.set_pause(paused)
+    lock.as_ref()
+        .ok_or("mpv not initialised")?
+        .set_pause(paused)
 }
 
 #[tauri::command]
 pub fn mpv_seek(seconds: f64, handle: State<'_, MpvHandle>) -> Result<(), String> {
     let lock = handle.0.lock().map_err(|e| e.to_string())?;
-    lock.as_ref().ok_or("mpv not initialised")?.seek_absolute(seconds)
+    lock.as_ref()
+        .ok_or("mpv not initialised")?
+        .seek_absolute(seconds)
 }
 
 #[tauri::command]
 pub fn mpv_set_volume(volume: f64, handle: State<'_, MpvHandle>) -> Result<(), String> {
     let lock = handle.0.lock().map_err(|e| e.to_string())?;
-    lock.as_ref().ok_or("mpv not initialised")?.set_volume(volume)
+    lock.as_ref()
+        .ok_or("mpv not initialised")?
+        .set_volume(volume)
 }
 
 #[tauri::command]
@@ -88,9 +90,15 @@ pub fn mpv_get_tracks(handle: State<'_, MpvHandle>) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn mpv_set_track(track_type: String, id: i64, handle: State<'_, MpvHandle>) -> Result<(), String> {
+pub fn mpv_set_track(
+    track_type: String,
+    id: i64,
+    handle: State<'_, MpvHandle>,
+) -> Result<(), String> {
     let lock = handle.0.lock().map_err(|e| e.to_string())?;
-    lock.as_ref().ok_or("mpv not initialised")?.set_track(&track_type, id)
+    lock.as_ref()
+        .ok_or("mpv not initialised")?
+        .set_track(&track_type, id)
 }
 
 #[tauri::command]
