@@ -111,6 +111,27 @@ export async function playStream(stream: Stream) {
   }
 };
 
+export async function getInstalledAddons(): Promise<InstalledAddon[]> {
+  const config: AddonConfig = await invoke("get_installed_addons");
+  return config.addons || [];
+}
+
+/**
+ * Install an addon by manifest URL.
+ * Requires Rust command: install_addon(manifest_url: String) -> Result<InstalledAddon, String>
+ */
+export async function installAddon(manifestUrl: string): Promise<InstalledAddon> {
+  return await invoke("install_addon", { manifestUrl });
+}
+
+/**
+ * Remove an installed addon by its transport URL.
+ * Requires Rust command: remove_addon(transport_url: String) -> Result<(), String>
+ */
+export async function removeAddon(transportUrl: string): Promise<void> {
+  return await invoke("remove_addon", { transportUrl });
+}
+
 /** Get a raw URL for mpv (skips FFmpeg transcoding for torrents). */
 export async function playStreamForMpv(stream: Stream) {
   try {

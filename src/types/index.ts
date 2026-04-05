@@ -10,6 +10,7 @@ export interface Manifest {
   id: string;
   name: string;
   version: string;
+  description?: string;
   logo: string;
   types: string[];
   resources: ResourceDescriptor[];

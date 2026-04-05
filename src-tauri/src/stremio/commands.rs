@@ -1,12 +1,41 @@
 use directories::ProjectDirs;
 use librqbit::api::TorrentIdOrHash;
 
-use super::models::PlayStreamRequest;
+use super::{models::PlayStreamRequest, store::InstalledAddon};
 
 #[tauri::command]
 pub async fn get_installed_addons() -> Result<super::store::AddonConfig, String> {
     let config = super::store::init_addons().await;
     Ok(config)
+}
+
+#[tauri::command]
+pub async fn install_addon(manifest_url: String) -> Result<InstalledAddon, String> {
+    let manifest = super::client::fetch_manifest(&manifest_url).await
+        .map_err(|e| format!("Failed to fetch manifest: {}", e))?;
+
+    let mut config = super::store::load_addons();
+    if config.addons.iter().any(|a| a.transport_url == manifest_url) {
+        return Err("Addon already installed".to_string());
+    }
+
+    let addon = InstalledAddon {
+        transport_url: manifest_url,
+        manifest,
+    };
+
+    config.addons.push(addon.clone());
+    super::store::save_addons(&config);
+
+    Ok(addon)
+}
+
+#[tauri::command]
+pub async fn remove_addon(transport_url: String) -> Result<(), String> {
+    let mut config = super::store::load_addons();
+    config.addons.retain(|a| a.transport_url != transport_url);
+    super::store::save_addons(&config);
+    Ok(())
 }
 
 #[tauri::command]

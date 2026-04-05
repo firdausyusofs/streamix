@@ -22,6 +22,25 @@ interface Track {
   selected: boolean;
 }
 
+interface TorrentStats {
+  downloadSpeed: number;
+  uploadSpeed:   number;
+  peers:         number;
+  downloaded:    number;
+  uploaded:      number;
+}
+
+function fmtBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
+  return `${(bytes / 1073741824).toFixed(2)} GB`;
+}
+
+function fmtSpeed(bps: number): string {
+  return `${fmtBytes(bps)}/s`;
+}
+
 interface PlayerProps {
   streamUrl: string | null;
   logo?: string;
@@ -68,6 +87,10 @@ export function Player({ streamUrl, logo, poster, title, infoHash, onClose }: Pl
 
   const [logoFailed,   setLogoFailed]   = useState(false);
   const [posterFailed, setPosterFailed] = useState(false);
+
+  const [showStats,    setShowStats]    = useState(false);
+  const [torrentStats, setTorrentStats] = useState<TorrentStats | null>(null);
+  const statsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const resetHide = useCallback(() => {
     setVisible(true);
@@ -246,6 +269,41 @@ export function Player({ streamUrl, logo, poster, title, infoHash, onClose }: Pl
     setAudioMenu(false);
   }, []);
 
+  const fetchTorrentStats = useCallback(async () => {
+    if (!infoHash || !streamUrl) return;
+    try {
+      const { origin } = new URL(streamUrl);
+      const res = await fetch(`${origin}/${infoHash}/stats`);
+      if (!res.ok) return;
+      const data: TorrentStats = await res.json();
+      setTorrentStats({
+        downloadSpeed: data.downloadSpeed,
+        uploadSpeed:   data.uploadSpeed,
+        peers:         data.peers,
+        downloaded:    data.downloaded,
+        uploaded:      data.uploaded,
+      });
+    } catch { /* ignore */ }
+  }, [infoHash, streamUrl]);
+
+  const handleStatsEnter = useCallback(() => {
+    setShowStats(true);
+    fetchTorrentStats();
+    statsIntervalRef.current = setInterval(fetchTorrentStats, 2000);
+  }, [fetchTorrentStats]);
+
+  const handleStatsLeave = useCallback(() => {
+    setShowStats(false);
+    if (statsIntervalRef.current) {
+      clearInterval(statsIntervalRef.current);
+      statsIntervalRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => {
+    if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
+  }, []);
+
   const handleClose = useCallback(() => {
     getCurrentWindow().setFullscreen(false).catch(() => {});
     invoke("mpv_stop");
@@ -263,6 +321,7 @@ export function Player({ streamUrl, logo, poster, title, infoHash, onClose }: Pl
       className="player-container"
       onMouseMove={resetHide}
       onClick={() => { setSubMenu(false); setAudioMenu(false); }}
+      onContextMenu={e => e.preventDefault()}
       style={{ cursor: visible ? "default" : "none" }}
     >
       {/* Transparent click target — mpv renders natively behind this */}
@@ -353,7 +412,7 @@ export function Player({ streamUrl, logo, poster, title, infoHash, onClose }: Pl
             </div>
 
             <span className="player-time">
-              {fmt(currentTime)}
+              {duration > 0 ? fmt(currentTime) : "--:--"}
               <span className="player-time-sep"> / </span>
               {duration > 0 ? fmt(duration) : "--:--"}
             </span>
@@ -404,6 +463,38 @@ export function Player({ streamUrl, logo, poster, title, infoHash, onClose }: Pl
                         {t.title || t.lang || `Audio ${t.id}`}
                       </button>
                     ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Torrent stats */}
+            {infoHash && (
+              <div
+                className="player-menu-anchor"
+                onMouseEnter={handleStatsEnter}
+                onMouseLeave={handleStatsLeave}
+              >
+                <button className="player-icon-btn" title="Stream stats">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                  </svg>
+                </button>
+                {showStats && (
+                  <div className="player-popup player-stats-popup" onClick={e => e.stopPropagation()}>
+                    <p className="player-popup-head">Stream Stats</p>
+                    <div className="player-stats-grid">
+                      <span className="player-stats-label">↓ Download</span>
+                      <span className="player-stats-value">{torrentStats ? fmtSpeed(torrentStats.downloadSpeed) : "—"}</span>
+                      <span className="player-stats-label">↑ Upload</span>
+                      <span className="player-stats-value">{torrentStats ? fmtSpeed(torrentStats.uploadSpeed) : "—"}</span>
+                      <span className="player-stats-label">Peers</span>
+                      <span className="player-stats-value">{torrentStats ? torrentStats.peers : "—"}</span>
+                      <span className="player-stats-label">Downloaded</span>
+                      <span className="player-stats-value">{torrentStats ? fmtBytes(torrentStats.downloaded) : "—"}</span>
+                      <span className="player-stats-label">Uploaded</span>
+                      <span className="player-stats-value">{torrentStats ? fmtBytes(torrentStats.uploaded) : "—"}</span>
+                    </div>
                   </div>
                 )}
               </div>

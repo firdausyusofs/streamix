@@ -35,6 +35,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // stremio commands
             stremio::commands::get_installed_addons,
+            stremio::commands::install_addon,
+            stremio::commands::remove_addon,
             stremio::commands::fetch_catalog_from_addon,
             stremio::commands::fetch_streams_from_addon,
             stremio::commands::play_stream_command,

@@ -8,6 +8,8 @@ pub struct Manifest {
     #[serde(default)]
     pub version: String,
     #[serde(default)]
+    pub description: String,
+    #[serde(default)]
     pub logo: String,
     #[serde(default)]
     pub types: Vec<String>,
@@ -153,4 +155,31 @@ pub struct PlayStreamRequest {
     pub url: Option<String>,
     pub info_hash: Option<String>,
     pub file_idx: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TorrentStatsResponse {
+    pub info_hash: String,
+    pub name: String,
+
+    pub downloaded: i64,
+    pub uploaded: i64,
+    pub download_speed: f64,
+    pub upload_speed: f64,
+
+    pub peers: i64,
+    pub queued: i64,
+    pub unique: i64,
+    pub is_paused: bool,
+
+    pub files: Vec<FileStats>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FileStats {
+    pub path: String,
+    pub name: String,
+    pub length: i64,
+    pub offset: i64,
 }
