@@ -86,6 +86,7 @@ pub struct MetaPreview {
     pub id: String,
     #[serde(default)]
     pub name: String,
+    #[serde(default)]
     pub description: String,
     #[serde(rename = "type")]
     pub item_type: String,
